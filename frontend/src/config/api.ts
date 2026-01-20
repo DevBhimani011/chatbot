@@ -18,6 +18,10 @@ export const API_ENDPOINTS = {
 
   // Chat
   CHAT: `${API_URL}/chat/`,
+
+  TREE_WORKFLOWS: `${API_URL}/tree-workflows`,
+  TREE_NODES: `${API_URL}/tree-workflows/nodes`,
+  TREE_EDGES: `${API_URL}/tree-workflows/edges`,
 };
 
 export default API_URL;

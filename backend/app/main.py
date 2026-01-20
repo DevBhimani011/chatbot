@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
+from app.db.init_db import init_db
 
 app = FastAPI(title="Static Chatbot API")
 
@@ -17,6 +18,10 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+@app.on_event("startup")
+def _startup() -> None:
+    init_db()
 
 @app.get("/")
 def health_check():

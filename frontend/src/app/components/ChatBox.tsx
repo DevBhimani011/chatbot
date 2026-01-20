@@ -1,64 +1,74 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { API_ENDPOINTS } from '@/config/api';
+import { useEffect, useRef, useState } from 'react';
+
+type ButtonOption = {
+  label: string;
+  value: string;
+};
 
 type Message = {
   sender: 'user' | 'bot';
-  text: string;
+  text?: string;
+  buttons?: ButtonOption[];
 };
 
 export default function ChatBox() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto scroll to bottom when messages change
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, loading]);
+  useEffect(scrollToBottom, [messages, loading]);
 
-  // Auto focus input on mount
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  /* ---------------- TREE START ---------------- */
+
+  useEffect(() => {
+    fetch('http://127.0.0.1:8000/chat/tree/start')
+      .then(res => res.json())
+      .then(data => {
+        setMessages([
+          {
+            sender: 'bot',
+            text: data.text,
+            buttons: data.buttons,
+          },
+        ]);
+      });
+  }, []);
+
+  /* ---------------- STATIC CHAT ---------------- */
 
   const sendMessage = async () => {
     if (!input.trim()) return;
 
     const userText = input;
-
-    // add user message once
-    setMessages(prev => [
-      ...prev,
-      { sender: 'user', text: userText },
-    ]);
-
     setInput('');
     setLoading(true);
 
+    setMessages(prev => [...prev, { sender: 'user', text: userText }]);
+
     try {
-      const res = await fetch(API_ENDPOINTS.CHAT, {
+      const res = await fetch('http://127.0.0.1:8000/chat/static', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userText }),
       });
 
       const data = await res.json();
 
-      setMessages(prev => [
-        ...prev,
-        { sender: 'bot', text: data.reply },
-      ]);
-    } catch (err) {
+      setMessages(prev => [...prev, { sender: 'bot', text: data.text }]);
+    } catch {
       setMessages(prev => [
         ...prev,
         { sender: 'bot', text: 'Server error' },
@@ -68,54 +78,81 @@ export default function ChatBox() {
     setLoading(false);
   };
 
-  // Auto focus input when loading changes
-  useEffect(() => {
-    if (!loading) {
-      inputRef.current?.focus();
-    }
-  }, [loading]);
+  /* ---------------- TREE BUTTON CLICK ---------------- */
+
+  const handleButtonClick = async (value: string) => {
+    setLoading(true);
+
+    setMessages(prev => [...prev, { sender: 'user', text: value }]);
+
+    const res = await fetch('http://127.0.0.1:8000/chat/tree/next', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    });
+
+    const data = await res.json();
+
+    setMessages(prev => [
+      ...prev,
+      {
+        sender: 'bot',
+        text: data.text,
+        buttons: data.buttons,
+      },
+    ]);
+
+    setLoading(false);
+  };
+
+  /* ---------------- UI ---------------- */
 
   return (
-    <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-      {/* Messages Container - Fixed Height */}
+    <div className="flex h-full flex-col rounded-xl bg-[#0f172a] shadow-xl">
+      {/* HEADER */}
+      <div className="border-b border-gray-700 px-4 py-3 text-center text-white">
+        <h2 className="text-lg font-semibold">🤖</h2>
+      </div>
+
+      {/* MESSAGES */}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        {messages.length === 0 && (
-          <div className="flex h-full items-center justify-center text-center">
-            <div>
-              <div className="mb-3 text-4xl">💬</div>
-              <p className="text-gray-500 dark:text-gray-400">
-                Start a conversation by typing a message below
-              </p>
-            </div>
-          </div>
-        )}
-        
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex ${
+              msg.sender === 'user' ? 'justify-end' : 'justify-start'
+            }`}
           >
             <div
-              className={`max-w-xs rounded-lg px-4 py-2 ${
+              className={`max-w-xs rounded-2xl px-4 py-2 text-sm ${
                 msg.sender === 'user'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800 text-gray-100'
               }`}
             >
-              <p className="break-words">{msg.text}</p>
+              {msg.text && <p>{msg.text}</p>}
+
+              {msg.buttons && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {msg.buttons.map((btn, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleButtonClick(btn.value)}
+                      className="rounded-full bg-blue-500 px-4 py-1 text-xs text-white transition hover:bg-blue-600"
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
 
         {loading && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 dark:bg-gray-800">
-              <div className="flex gap-1">
-                <div className="h-2 w-2 animate-bounce rounded-full bg-gray-400"></div>
-                <div className="animation-delay-200 h-2 w-2 animate-bounce rounded-full bg-gray-400"></div>
-                <div className="animation-delay-400 h-2 w-2 animate-bounce rounded-full bg-gray-400"></div>
-              </div>
-              <span className="text-sm text-gray-600 dark:text-gray-400">Bot is typing...</span>
+            <div className="rounded-xl bg-gray-800 px-4 py-2 text-xs text-gray-400">
+              Bot is typing...
             </div>
           </div>
         )}
@@ -123,22 +160,22 @@ export default function ChatBox() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+      {/* INPUT */}
+      <div className="border-t border-gray-700 p-4">
         <div className="flex gap-2">
           <input
             ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:ring-blue-900"
             onKeyDown={e => e.key === 'Enter' && sendMessage()}
+            placeholder="Type a message..."
             disabled={loading}
+            className="flex-1 rounded-full bg-gray-800 px-4 py-2 text-sm text-white outline-none placeholder-gray-500 focus:ring-2 focus:ring-blue-600"
           />
           <button
             onClick={sendMessage}
             disabled={loading || !input.trim()}
-            className="rounded-lg bg-blue-500 px-6 py-2 font-medium text-white transition-colors hover:bg-blue-600 disabled:bg-gray-400 dark:bg-blue-600 dark:hover:bg-blue-700"
+            className="rounded-full bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:bg-gray-600"
           >
             Send
           </button>

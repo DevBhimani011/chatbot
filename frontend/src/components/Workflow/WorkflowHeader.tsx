@@ -19,6 +19,13 @@ export function WorkflowHeader() {
             >
               Chat
             </a>
+            <a
+  href="/faq-workflows"
+  className="rounded-lg bg-green-500 px-4 py-2 text-white font-medium hover:bg-green-600"
+>
+  FAQ Builder
+</a>
+
           </div>
         </div>
       </div>
