@@ -44,6 +44,7 @@ def create_edge(payload: EdgeCreate):
         "from_node_id": result[2],
         "to_node_id": result[3]
     }
+    
 @router.get("/workflow/{workflow_id}")
 def get_workflow_edges(workflow_id: str):
     conn = get_connection()
@@ -72,3 +73,16 @@ def get_workflow_edges(workflow_id: str):
         }
         for row in rows
     ]
+    
+@router.delete("/{edge_id}")
+def delete_edge(edge_id: str):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM edge WHERE id = %s", (edge_id,))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"status": "edge_deleted", "id": edge_id}

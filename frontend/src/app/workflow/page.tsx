@@ -1,8 +1,16 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Node, Edge, addEdge, Connection, useNodesState, useEdgesState, NodeMouseHandler } from 'reactflow';
-import 'reactflow/dist/style.css';
+import {
+  Node,
+  Edge,
+  addEdge,
+  Connection,
+  useNodesState,
+  useEdgesState,
+  NodeMouseHandler,
+} from 'reactflow';
+
 import {
   WorkflowNode,
   WorkflowLeftPanel,
@@ -10,367 +18,242 @@ import {
   WorkflowRightPanel,
   WorkflowHeader,
 } from '@/components/Workflow';
+
 import { API_ENDPOINTS } from '@/config/api';
 
-type Workflow = {
-  id: string;
-  name: string;
-};
+type Workflow = { id: string; name: string };
+type NodeData = { id: string; value: string };
 
-type NodeData = {
-  id: string;
-  value: string;
-};
-
-type BackendEdge = {
-  id: string;
-  from_node_id: string;
-  to_node_id: string;
-};
-
-// Define nodeTypes outside component to prevent warnings
 const nodeTypes = { default: WorkflowNode };
 
 export default function WorkflowPage() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
+
   const [backendNodes, setBackendNodes] = useState<NodeData[]>([]);
-  const [backendEdges, setBackendEdges] = useState<BackendEdge[]>([]);
-  const [name, setName] = useState('');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
-  // React Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
   const selectedNode = backendNodes.find(n => n.id === selectedNodeId);
 
-  /* -------------------- API CALLS -------------------- */
+  /* ---------------- LOAD ---------------- */
 
   const fetchWorkflows = async () => {
     const res = await fetch(API_ENDPOINTS.WORKFLOWS);
-    const data = await res.json();
-    setWorkflows(data);
+    setWorkflows(await res.json());
   };
 
-  const fetchNodes = async (workflowId: string) => {
-    try {
-      const res = await fetch(API_ENDPOINTS.WORKFLOW_NODES(workflowId));
-      const data = await res.json();
-      setBackendNodes(data);
-
-      // Fetch edges from backend using the new endpoint
-      let edgesData: BackendEdge[] = [];
-      try {
-        const edgesRes = await fetch(
-          API_ENDPOINTS.EDGES_BY_WORKFLOW(workflowId)
-        );
-        if (edgesRes.ok) {
-          const edgesResponseData = await edgesRes.json();
-          if (Array.isArray(edgesResponseData)) {
-            edgesData = edgesResponseData;
-          }
-        }
-      } catch (error) {
-      }
-      setBackendEdges(edgesData);
-
-      // Convert to React Flow format
-      const rfNodes: Node[] = data.map((node: NodeData, index: number) => {
-        const isSelected = selectedNodeId === node.id;
-        return {
-          id: node.id,
-          data: { label: node.value || '(empty)', isSelected },
-          position: { x: 250, y: index * 150 },
-          type: 'default',
-          selected: isSelected,
-          style: {
-            background: isSelected ? '#dbeafe' : '#ffffff',
-            border: isSelected ? '3px solid #3b82f6' : '2px solid #d1d5db',
-            borderRadius: '8px',
-            padding: '12px',
-            fontSize: '14px',
-            fontWeight: '500',
-            cursor: 'pointer',
-          },
-        };
-      });
-
-      // Convert edges to React Flow format
-      const rfEdges: Edge[] = edgesData.map((edge: BackendEdge) => ({
-        id: edge.id,
-        source: edge.from_node_id,
-        target: edge.to_node_id,
-      }));
-
-      setNodes(rfNodes);
-      setEdges(rfEdges);
-    } catch (error) {
-      console.error('Error fetching nodes:', error);
-    }
-  };
-
-  const createWorkflow = async () => {
-    if (!name.trim()) return;
-
-    const res = await fetch(API_ENDPOINTS.WORKFLOWS, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-
-    const workflow = await res.json();
-
-    // create first empty card
-    await fetch(API_ENDPOINTS.NODES, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        workflow_id: workflow.id,
-        value: '',
-      }),
-    });
-
-    setName('');
-    fetchWorkflows();
-  };
-
-  const selectWorkflow = (wf: Workflow) => {
+  const loadWorkflow = async (wf: Workflow) => {
     setSelectedWorkflow(wf);
     setSelectedNodeId(null);
-    fetchNodes(wf.id);
+    setSelectedEdgeId(null);
+
+    const nodesRes = await fetch(API_ENDPOINTS.WORKFLOW_NODES(wf.id));
+    const nodesData: NodeData[] = await nodesRes.json();
+
+    const edgesRes = await fetch(API_ENDPOINTS.EDGES_BY_WORKFLOW(wf.id));
+    const edgesData = await edgesRes.json();
+
+    setBackendNodes(nodesData);
+
+    setNodes(
+      nodesData.map((n, i) => ({
+        id: n.id,
+        data: { label: n.value || '(empty)' },
+        position: { x: 200, y: i * 150 },
+        type: 'default',
+      }))
+    );
+
+    setEdges(
+      edgesData.map((e: any) => ({
+        id: e.id,
+        source: e.from_node_id,
+        target: e.to_node_id,
+      }))
+    );
+  };
+
+  /* ---------------- NODE ---------------- */
+
+  const saveNode = async () => {
+    if (!selectedNodeId) return;
+
+    await fetch(`${API_ENDPOINTS.NODES}/${selectedNodeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: editValue }),
+    });
+
+    setBackendNodes(n =>
+      n.map(x => (x.id === selectedNodeId ? { ...x, value: editValue } : x))
+    );
+
+    setNodes(n =>
+      n.map(x =>
+        x.id === selectedNodeId
+          ? { ...x, data: { label: editValue || '(empty)' } }
+          : x
+      )
+    );
   };
 
   const addNextCard = async () => {
+  if (!selectedWorkflow) return;
+
+  const res = await fetch(API_ENDPOINTS.NODES, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      workflow_id: selectedWorkflow.id,
+      value: '',
+    }),
+  });
+
+  const node = await res.json();
+
+  // backend state
+  setBackendNodes(prev => [...prev, node]);
+
+  // react-flow state
+  setNodes(prev => [
+    ...prev,
+    {
+      id: node.id,
+      data: { label: '(empty)' },
+      position: { x: 200, y: prev.length * 150 },
+      type: 'default',
+    },
+  ]);
+
+  // just select the new node
+  setSelectedNodeId(node.id);
+  setEditValue('');
+};
+
+
+  const deleteNode = async () => {
+    if (!selectedNodeId) return;
+
+    await fetch(`${API_ENDPOINTS.NODES}/${selectedNodeId}`, { method: 'DELETE' });
+
+    setNodes(n => n.filter(x => x.id !== selectedNodeId));
+    setEdges(e => e.filter(x => x.source !== selectedNodeId && x.target !== selectedNodeId));
+    setBackendNodes(n => n.filter(x => x.id !== selectedNodeId));
+    setSelectedNodeId(null);
+  };
+
+  /* ---------------- EDGE ---------------- */
+
+  const deleteEdge = async () => {
+    if (!selectedEdgeId) return;
+    await fetch(`${API_ENDPOINTS.EDGES}/${selectedEdgeId}`, { method: 'DELETE' });
+    setEdges(e => e.filter(x => x.id !== selectedEdgeId));
+    setSelectedEdgeId(null);
+  };
+
+  const onConnect = async (connection: Connection) => {
     if (!selectedWorkflow) return;
 
-    const res = await fetch(API_ENDPOINTS.NODES, {
+    const res = await fetch(API_ENDPOINTS.EDGES, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         workflow_id: selectedWorkflow.id,
-        value: '',
+        from_node_id: connection.source,
+        to_node_id: connection.target,
       }),
     });
 
-    const newNode = await res.json();
-
-    // Add new node to React Flow
-    const newRFNode: Node = {
-      id: newNode.id,
-      data: { label: '' },
-      position: { x: 250, y: backendNodes.length * 150 },
-      type: 'default',
-      style: {
-        background: '#ffffff',
-        border: '2px solid #d1d5db',
-        borderRadius: '8px',
-        padding: '12px',
-        fontSize: '14px',
-        fontWeight: '500',
-        cursor: 'pointer',
-      },
-    };
-
-    setNodes(prev => [...prev, newRFNode]);
-    setBackendNodes(prev => [...prev, newNode]);
-
-    // Create edge from last node to new node
-    if (backendNodes.length > 0) {
-      const lastNode = backendNodes[backendNodes.length - 1];
-      try {
-        const edgeRes = await fetch(API_ENDPOINTS.EDGES, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            workflow_id: selectedWorkflow.id,
-            from_node_id: lastNode.id,
-            to_node_id: newNode.id,
-          }),
-        });
-
-        if (edgeRes.ok) {
-          const newEdge = await edgeRes.json();
-          const edge: Edge = {
-            id: newEdge.id || `${lastNode.id}-${newNode.id}`,
-            source: lastNode.id,
-            target: newNode.id,
-          };
-          setEdges(prev => [...prev, edge]);
-          setBackendEdges(prev => [...prev, newEdge]);
-        }
-      } catch (error) {
-        console.error('Error creating edge:', error);
-      }
-    }
-
-    setSelectedNodeId(newNode.id);
+    const edge = await res.json();
+    setEdges(e => addEdge({ ...connection, id: edge.id }, e));
   };
 
-  const saveNode = async () => {
-    if (!selectedNode || !selectedWorkflow) return;
-
-    await fetch(API_ENDPOINTS.NODE_BY_ID(selectedNode.id), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        value: editValue,
-      }),
-    });
-
-    // Update only the changed node without refetching all nodes
-    setBackendNodes(prevNodes =>
-      prevNodes.map(node =>
-        node.id === selectedNode.id ? { ...node, value: editValue } : node
-      )
-    );
-
-    // Update React Flow nodes
-    setNodes(prevNodes =>
-      prevNodes.map(node =>
-        node.id === selectedNode.id
-          ? { ...node, data: { ...node.data, label: editValue || '(empty)' } }
-          : node
-      )
-    );
-  };
-
-  /* -------------------- EFFECTS -------------------- */
-
-  useEffect(() => {
-    fetchWorkflows();
-  }, []);
-
-  useEffect(() => {
-    if (selectedNode) {
-      setEditValue(selectedNode.value || '');
-    }
-  }, [selectedNodeId, selectedNode]);
-
-  // Update node styles when selectedNodeId changes
-  useEffect(() => {
-    setNodes(prevNodes =>
-      prevNodes.map(node => ({
-        ...node,
-        selected: node.id === selectedNodeId,
-        style: {
-          ...node.style,
-          background: node.id === selectedNodeId ? '#dbeafe' : '#ffffff',
-          border: node.id === selectedNodeId ? '3px solid #3b82f6' : '2px solid #d1d5db',
-        },
-      }))
-    );
-  }, [selectedNodeId, setNodes]);
+  /* ---------------- WORKFLOW ---------------- */
 
   const deleteWorkflow = async () => {
     if (!selectedWorkflow) return;
-
-    const ok = window.confirm(
-      `Are you sure you want to delete workflow "${selectedWorkflow.name}"?`
-    );
-
-    if (!ok) return;
 
     await fetch(API_ENDPOINTS.WORKFLOW_BY_ID(selectedWorkflow.id), {
       method: 'DELETE',
     });
 
-    // reset UI state
     setSelectedWorkflow(null);
-    setSelectedNodeId(null);
-    setBackendNodes([]);
-    setBackendEdges([]);
-    setEditValue('');
     setNodes([]);
     setEdges([]);
-
+    setBackendNodes([]);
     fetchWorkflows();
   };
 
-  // Handle node click to select it
-  const handleNodeClick: NodeMouseHandler = useCallback((event, node) => {
+  /* ---------------- EVENTS ---------------- */
+
+  const onNodeClick: NodeMouseHandler = (_, node) => {
     setSelectedNodeId(node.id);
-  }, [setSelectedNodeId]);
+    setSelectedEdgeId(null);
+    setEditValue(node.data.label);
+  };
 
-  // Handle connection between nodes
-  const handleConnect = useCallback(
-    async (connection: Connection) => {
-      if (!selectedWorkflow || !connection.source || !connection.target) return;
-
-      try {
-        // Create edge in backend
-        const edgeRes = await fetch(API_ENDPOINTS.EDGES, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            workflow_id: selectedWorkflow.id,
-            from_node_id: connection.source,
-            to_node_id: connection.target,
-          }),
-        });
-
-        if (edgeRes.ok) {
-          const newEdge = await edgeRes.json();
-          // Add the edge to backend edges state
-          setBackendEdges(prev => [...prev, newEdge]);
-          
-          // Add edge to React Flow with proper ID
-          const edge: Edge = {
-            id: newEdge.id || `${connection.source}-${connection.target}`,
-            source: connection.source,
-            target: connection.target,
-          };
-          setEdges(eds => addEdge(edge, eds));
-        }
-      } catch (error) {
-        console.error('Error creating edge:', error);
-      }
-    },
-    [selectedWorkflow, setEdges]
-  );
-
-  // Handle pane click to deselect
-  const handlePaneClick = useCallback(() => {
+  const onEdgeClick = (_: any, edge: Edge) => {
+    setSelectedEdgeId(edge.id);
     setSelectedNodeId(null);
+  };
+
+  const onNodeDragStop = useCallback(
+  async (_: any, node: Node) => {
+    await fetch(`${API_ENDPOINTS.TREE_NODES}/${node.id}/position`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        position_x: node.position.x,
+        position_y: node.position.y,
+      }),
+    });
+  },
+  []
+);
+
+
+  useEffect(() => {
+    fetchWorkflows();
   }, []);
 
-  /* -------------------- UI -------------------- */
-
   return (
-    <div className="flex h-screen flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
+    <div className="flex h-screen flex-col">
       <WorkflowHeader />
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* LEFT PANEL - Workflows List */}
+      <div className="flex flex-1">
         <WorkflowLeftPanel
           workflows={workflows}
           selectedWorkflow={selectedWorkflow}
-          onSelectWorkflow={selectWorkflow}
+          onSelectWorkflow={loadWorkflow}
           onRefresh={fetchWorkflows}
         />
 
-        {/* CANVAS - React Flow */}
         <WorkflowCanvas
           selectedWorkflow={selectedWorkflow}
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          onNodeClick={handleNodeClick}
-          onConnect={handleConnect}
+          onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
+          onConnect={onConnect}
           nodeTypes={nodeTypes}
-          backendNodes={backendNodes}
         />
 
-        {/* RIGHT PANEL - Properties */}
         <WorkflowRightPanel
           selectedNode={selectedNode}
+          selectedEdgeId={selectedEdgeId}
           editValue={editValue}
           onEditValueChange={setEditValue}
           onSaveNode={saveNode}
           onAddNextCard={addNextCard}
+          onDeleteNode={deleteNode}
+          onDeleteEdge={deleteEdge}
           onDeleteWorkflow={deleteWorkflow}
           selectedWorkflow={selectedWorkflow}
         />

@@ -14,6 +14,7 @@ import ReactFlow, {
   useEdgesState,
   useNodesState,
 } from 'reactflow';
+import type { Edge as RFEdge } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import { API_ENDPOINTS } from '@/config/api';
@@ -57,6 +58,8 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
   const selectedNode = useMemo(
     () => backendNodes.find(n => n.id === selectedNodeId),
@@ -217,6 +220,55 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
     [selectedWorkflow, setEdges]
   );
 
+  const onEdgeClick = useCallback(
+  (_: React.MouseEvent, edge: RFEdge) => {
+    setSelectedEdgeId(edge.id);
+    setSelectedNodeId(null);
+  },
+  []
+);
+
+const deleteFaqNode = async () => {
+  if (!selectedNodeId) return;
+
+  await fetch(`${API_ENDPOINTS.TREE_NODES}/${selectedNodeId}`, {
+    method: 'DELETE',
+  });
+
+  setNodes(prev => prev.filter(n => n.id !== selectedNodeId));
+  setEdges(prev => prev.filter(e => e.source !== selectedNodeId && e.target !== selectedNodeId));
+  setBackendNodes(prev => prev.filter(n => n.id !== selectedNodeId));
+
+  setSelectedNodeId(null);
+  setEditValue('');
+};
+
+const deleteFaqEdge = async () => {
+  if (!selectedEdgeId) return;
+
+  await fetch(`${API_ENDPOINTS.TREE_EDGES}/${selectedEdgeId}`, {
+    method: 'DELETE',
+  });
+
+  setEdges(prev => prev.filter(e => e.id !== selectedEdgeId));
+  setSelectedEdgeId(null);
+};
+
+const deleteFaqWorkflow = async () => {
+  if (!selectedWorkflow) return;
+
+  await fetch(`${API_ENDPOINTS.TREE_WORKFLOWS}/${selectedWorkflow.id}`, {
+    method: 'DELETE',
+  });
+
+  setSelectedWorkflow(null);
+  setNodes([]);
+  setEdges([]);
+  fetchWorkflows();
+};
+
+
+
   useEffect(() => {
     fetchWorkflows();
   }, [fetchWorkflows]);
@@ -322,6 +374,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onNodeClick={onNodeClick}
+              onEdgeClick={onEdgeClick}
               onPaneClick={onPaneClick}
               onConnect={onConnect}
               nodeTypes={nodeTypes}
@@ -379,6 +432,34 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
           >
             ➕ Add FAQ Node
           </button>
+
+          {selectedNode && (
+  <button
+    onClick={deleteFaqNode}
+    className="w-full rounded-lg bg-red-500 px-4 py-2 text-white hover:bg-red-600"
+  >
+    🗑 Delete Node
+  </button>
+)}
+
+{selectedEdgeId && (
+  <button
+    onClick={deleteFaqEdge}
+    className="mt-2 w-full rounded-lg bg-red-400 px-4 py-2 text-white hover:bg-red-500"
+  >
+    🗑 Delete Edge
+  </button>
+)}
+
+{selectedWorkflow && (
+  <button
+    onClick={deleteFaqWorkflow}
+    className="mt-6 w-full rounded-lg bg-red-700 px-4 py-2 text-white hover:bg-red-800"
+  >
+    ❌ Delete Workflow
+  </button>
+)}
+
         </div>
       </div>
     </div>

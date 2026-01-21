@@ -30,7 +30,7 @@ def static_chat(payload: StaticChatRequest):
     conn = get_connection()
     cur = conn.cursor()
 
-    # find static node globally
+    # Try STATIC first
     cur.execute(
         """
         SELECT child.value
@@ -44,18 +44,33 @@ def static_chat(payload: StaticChatRequest):
     )
 
     row = cur.fetchone()
+
+    if row:
+        cur.close()
+        conn.close()
+        return {
+            "type": "static",
+            "text": row[0]
+        }
+
+    cur.execute(
+        "SELECT id FROM tree_node WHERE LOWER(value) = LOWER(%s) LIMIT 1",
+        (payload.message,)
+    )
+
+    node = cur.fetchone()
     cur.close()
     conn.close()
 
-    if not row:
+    if node:
         return {
-            "type": "text",
-            "text": "Sorry, I don't understand."
+            "type": "faq",
+            "value": payload.message
         }
 
     return {
-        "type": "text",
-        "text": row[0]
+        "type": "none",
+        "text": "Sorry, I don't understand."
     }
 
 

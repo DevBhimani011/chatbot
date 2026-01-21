@@ -50,33 +50,61 @@ export default function ChatBox() {
   /* ---------------- STATIC CHAT ---------------- */
 
   const sendMessage = async () => {
-    if (!input.trim()) return;
+  if (!input.trim()) return;
 
-    const userText = input;
-    setInput('');
-    setLoading(true);
+  const userText = input;
+  setInput('');
+  setLoading(true);
 
-    setMessages(prev => [...prev, { sender: 'user', text: userText }]);
+  setMessages(prev => [...prev, { sender: 'user', text: userText }]);
 
-    try {
-      const res = await fetch('http://127.0.0.1:8000/chat/static', {
+  try {
+    const res = await fetch('http://127.0.0.1:8000/chat/static', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: userText }),
+    });
+
+    const data = await res.json();
+
+    // ✅ STATIC ANSWER
+    if (data.type === 'static') {
+      setMessages(prev => [...prev, { sender: 'bot', text: data.text }]);
+    }
+
+    // 🔁 FALLBACK → FAQ TREE
+    else if (data.type === 'faq') {
+      const faqRes = await fetch('http://127.0.0.1:8000/chat/tree/next', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify({ value: data.value }),
       });
 
-      const data = await res.json();
+      const faqData = await faqRes.json();
 
-      setMessages(prev => [...prev, { sender: 'bot', text: data.text }]);
-    } catch {
       setMessages(prev => [
         ...prev,
-        { sender: 'bot', text: 'Server error' },
+        {
+          sender: 'bot',
+          text: faqData.text,
+          buttons: faqData.buttons,
+        },
       ]);
     }
 
-    setLoading(false);
-  };
+    else {
+      setMessages(prev => [...prev, { sender: 'bot', text: data.text }]);
+    }
+  } catch {
+    setMessages(prev => [
+      ...prev,
+      { sender: 'bot', text: 'Server error' },
+    ]);
+  }
+
+  setLoading(false);
+};
+
 
   /* ---------------- TREE BUTTON CLICK ---------------- */
 
