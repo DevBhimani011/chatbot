@@ -1,6 +1,9 @@
-import FAQEditor from './FAQEditor';
+'use client';
 
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  return <FAQEditor treeWorkflowId={id} />;
+import { useParams } from 'next/navigation';
+import FAQWorkflowBuilder from '../FAQWorkflowBuilder';
+
+export default function Page() {
+  const params = useParams<{ id: string }>();
+  return <FAQWorkflowBuilder initialWorkflowId={params.id} />;
 }
