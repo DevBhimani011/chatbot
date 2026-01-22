@@ -5,14 +5,8 @@ from app.db.session import get_connection
 
 router = APIRouter(prefix="/tree-workflows", tags=["FAQ Workflows"])
 
-
-# ======================================================
-# MODELS
-# ======================================================
-
 class TreeWorkflowCreate(BaseModel):
     name: str
-
 
 class TreeNodeCreate(BaseModel):
     tree_workflow_id: UUID
@@ -20,10 +14,8 @@ class TreeNodeCreate(BaseModel):
     position_x: float | None = None
     position_y: float | None = None
 
-
 class TreeNodeUpdate(BaseModel):
     value: str
-
 
 class TreeEdgeCreate(BaseModel):
     tree_workflow_id: UUID
@@ -33,11 +25,6 @@ class TreeEdgeCreate(BaseModel):
 class TreeNodePositionUpdate(BaseModel):
     position_x: float
     position_y: float
-
-
-# ======================================================
-# TREE WORKFLOW
-# ======================================================
 
 @router.post("/nodes")
 def create_tree_node(payload: TreeNodeCreate):
@@ -70,7 +57,6 @@ def create_tree_node(payload: TreeNodeCreate):
         "position_y": row[3],
     }
 
-
 @router.patch("/nodes/{node_id}/position")
 def update_tree_node_position(node_id: UUID, payload: TreeNodePositionUpdate):
     conn = get_connection()
@@ -90,7 +76,6 @@ def update_tree_node_position(node_id: UUID, payload: TreeNodePositionUpdate):
     conn.close()
 
     return {"status": "position_updated"}
-
 
 @router.get("/")
 def list_tree_workflows():
@@ -113,11 +98,6 @@ def list_tree_workflows():
         {"id": r[0], "name": r[1]}
         for r in rows
     ]
-
-
-# ======================================================
-# TREE NODES
-# ======================================================
 
 @router.post("/nodes")
 def create_tree_node(payload: TreeNodeCreate):
@@ -187,11 +167,6 @@ def update_tree_node(node_id: UUID, payload: TreeNodeUpdate):
     conn.close()
 
     return {"status": "updated"}
-
-
-# ======================================================
-# TREE EDGES
-# ======================================================
 
 @router.post("/edges")
 def create_tree_edge(payload: TreeEdgeCreate):

@@ -1,6 +1,16 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from app.db.session import get_connection
+
+from app.rag.chunking import chunk_text
+from app.rag.embeddings import embed_text
+from app.rag.milvus_store import insert_chunks
+from app.rag.minio_client import get_minio_client
+
+from uuid import uuid4
+from pypdf import PdfReader
+import io
+
 
 router = APIRouter(prefix="/chat", tags=["Chatbot"])
 
@@ -226,4 +236,60 @@ def create_tree_edge(payload: TreeEdgeCreate):
         "id": edge_id,
         "from_node_id": payload.from_node_id,
         "to_node_id": payload.to_node_id
+    }
+
+@router.post("/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+    # 1️⃣ Read PDF bytes
+    pdf_bytes = await file.read()
+
+    # 2️⃣ Extract text
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    full_text = ""
+    for page in reader.pages:
+        text = page.extract_text()
+        if text:
+            full_text += text + "\n"
+
+    if not full_text.strip():
+        raise HTTPException(status_code=400, detail="No text found in PDF")
+
+    # 3️⃣ Chunk text (generic, works for any PDF)
+    chunks = chunk_text(full_text)
+
+    if not chunks:
+        raise HTTPException(status_code=400, detail="Chunking failed")
+
+    # 4️⃣ Upload PDF to MinIO
+    minio = get_minio_client()
+    bucket = "documents"
+
+    if not minio.bucket_exists(bucket):
+        minio.make_bucket(bucket)
+
+    object_name = f"{uuid4()}_{file.filename}"
+    minio.put_object(
+        bucket_name=bucket,
+        object_name=object_name,
+        data=io.BytesIO(pdf_bytes),
+        length=len(pdf_bytes),
+        content_type="application/pdf",
+    )
+
+    # 5️⃣ Store chunks in Milvus
+    document_id = str(uuid4())
+
+    insert_chunks(
+        document_id=document_id,
+        filename=file.filename,
+        chunks=chunks,
+    )
+
+    return {
+        "status": "success",
+        "filename": file.filename,
+        "chunks": len(chunks),
     }
