@@ -21,6 +21,8 @@ export default function ChatBox() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -59,7 +61,7 @@ export default function ChatBox() {
   setMessages(prev => [...prev, { sender: 'user', text: userText }]);
 
   try {
-    const res = await fetch('http://127.0.0.1:8000/chat/static', {
+    const res = await fetch('http://127.0.0.1:8000/chat/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: userText }),
@@ -131,6 +133,27 @@ export default function ChatBox() {
     ]);
 
     setLoading(false);
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("http://127.0.0.1:8000/chat/upload-pdf", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    alert(`PDF uploaded: ${data.filename}\nChunks: ${data.chunks}`);
   };
 
   /* ---------------- UI ---------------- */
@@ -208,6 +231,20 @@ export default function ChatBox() {
             Send
           </button>
         </div>
+        <button
+        onClick={handleUploadClick}
+        className="mb-2 rounded bg-blue-600 px-4 py-2 text-white"
+      >
+        📄 Upload PDF
+      </button>
+
+      <input
+        type="file"
+        accept="application/pdf"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        hidden
+      />
       </div>
     </div>
   );

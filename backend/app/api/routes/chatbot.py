@@ -1,3 +1,4 @@
+from app.rag.qa import answer_question
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from app.db.session import get_connection
@@ -35,7 +36,7 @@ class TreeEdgeCreate(BaseModel):
 
 # -------------------- STATIC CHAT (TEXT INPUT) --------------------
 
-@router.post("/static")
+@router.post("/message")
 def static_chat(payload: StaticChatRequest):
     conn = get_connection()
     cur = conn.cursor()
@@ -77,6 +78,10 @@ def static_chat(payload: StaticChatRequest):
             "type": "faq",
             "value": payload.message
         }
+        
+    rag_answer = answer_question(payload.message)
+    if rag_answer != "No answer found in the document.":
+        return {"type": "rag", "text": rag_answer}
 
     return {
         "type": "none",
