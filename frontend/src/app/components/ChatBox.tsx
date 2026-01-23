@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { API_ENDPOINTS } from '@/config/api'; // adjust path if needed
+
 
 type ButtonOption = {
   label: string;
@@ -36,7 +38,7 @@ export default function ChatBox() {
   /* ---------------- TREE START ---------------- */
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/chat/tree/start')
+    fetch(`${API_ENDPOINTS.CHAT}tree/start`)
       .then(res => res.json())
       .then(data => {
         setMessages([
@@ -61,7 +63,7 @@ export default function ChatBox() {
   setMessages(prev => [...prev, { sender: 'user', text: userText }]);
 
   try {
-    const res = await fetch('http://127.0.0.1:8000/chat/message', {
+    const res = await fetch(`${API_ENDPOINTS.CHAT}message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: userText }),
@@ -76,7 +78,7 @@ export default function ChatBox() {
 
     // 🔁 FALLBACK → FAQ TREE
     else if (data.type === 'faq') {
-      const faqRes = await fetch('http://127.0.0.1:8000/chat/tree/next', {
+      const faqRes = await fetch(`${API_ENDPOINTS.CHAT}tree/next`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: data.value }),
@@ -115,7 +117,7 @@ export default function ChatBox() {
 
     setMessages(prev => [...prev, { sender: 'user', text: value }]);
 
-    const res = await fetch('http://127.0.0.1:8000/chat/tree/next', {
+    const res = await fetch(`${API_ENDPOINTS.CHAT}tree/next`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value }),
@@ -146,7 +148,7 @@ export default function ChatBox() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("http://localhost:8000/chat/upload-pdf", {
+    const res = await fetch(`${API_ENDPOINTS.CHAT}upload-pdf`, {
       method: "POST",
       body: formData,
     });
