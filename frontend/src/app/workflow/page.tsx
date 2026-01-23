@@ -81,13 +81,20 @@ export default function WorkflowPage() {
   /* ---------------- NODE ---------------- */
 
   const saveNode = async () => {
-    if (!selectedNodeId) return;
-
-    await fetch(`${API_ENDPOINTS.NODES}/${selectedNodeId}`, {
+  if (!selectedNodeId) return;
+    console.log('Saving node:', selectedNodeId, editValue);
+    console.log('API_URL:', API_ENDPOINTS.NODES); // Check what URL is actually being used
+  console.log('Saving node:', selectedNodeId, editValue);
+  try {
+    const response = await fetch(`${API_ENDPOINTS.NODES}/${selectedNodeId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: editValue }),
     });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
     setBackendNodes(n =>
       n.map(x => (x.id === selectedNodeId ? { ...x, value: editValue } : x))
@@ -100,7 +107,10 @@ export default function WorkflowPage() {
           : x
       )
     );
-  };
+  } catch (error) {
+    console.error('Failed to save node:', error);
+  }
+};
 
   const addNextCard = async () => {
   if (!selectedWorkflow) return;
