@@ -18,7 +18,9 @@ def extract_text_from_pdf(source: Union[str, bytes]) -> str:
         # If the page has very little text, attempt OCR
         if not page_text.strip():
             try:
-                pix = page.get_pixmap()
+                # Zoom x2 for better OCR accuracy
+                matrix = fitz.Matrix(2, 2)
+                pix = page.get_pixmap(matrix=matrix)
                 img_data = pix.tobytes("png")
                 image = Image.open(io.BytesIO(img_data))
                 # Using pytesseract to extract text from the image
