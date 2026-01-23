@@ -9,7 +9,7 @@ from app.rag.milvus_store import insert_chunks
 from app.rag.minio_client import get_minio_client
 
 from uuid import uuid4
-from pypdf import PdfReader
+from app.rag.pdf_loader import extract_text_from_pdf
 import io
 
 
@@ -252,12 +252,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     pdf_bytes = await file.read()
 
     # 2️⃣ Extract text
-    reader = PdfReader(io.BytesIO(pdf_bytes))
-    full_text = ""
-    for page in reader.pages:
-        text = page.extract_text()
-        if text:
-            full_text += text + "\n"
+    full_text = extract_text_from_pdf(pdf_bytes)
 
     if not full_text.strip():
         raise HTTPException(status_code=400, detail="No text found in PDF")
