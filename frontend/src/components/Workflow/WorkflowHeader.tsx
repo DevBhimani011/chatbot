@@ -1,31 +1,37 @@
+import Link from 'next/link';
+
 export function WorkflowHeader() {
   return (
-    <nav className="border-b border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+    <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-md sticky top-0 z-20">
+      <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Workflow Builder
-          </h1>
-          <div className="flex gap-3">
-            <a
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
+              Workflow Builder
+            </h1>
+            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold border border-blue-100">
+              BETA
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <Link
               href="/"
-              className="rounded-lg px-4 py-2 text-gray-700 font-medium transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+              className="rounded-lg px-4 py-2 text-sm text-gray-600 font-medium transition-colors hover:bg-gray-50 hover:text-gray-900"
             >
               Home
-            </a>
-            <a
+            </Link>
+            <Link
               href="/chat"
-              className="rounded-lg bg-blue-500 px-4 py-2 text-white font-medium transition-all hover:bg-blue-600"
+              className="rounded-lg bg-white border border-gray-200 px-4 py-2 text-sm text-gray-700 font-medium hover:bg-gray-50 hover:text-primary transition-all shadow-sm"
             >
               Chat
-            </a>
-            <a
-  href="/faq-workflows"
-  className="rounded-lg bg-green-500 px-4 py-2 text-white font-medium hover:bg-green-600"
->
-  FAQ Builder
-</a>
-
+            </Link>
+            <Link
+              href="/faq-workflows"
+              className="rounded-lg bg-primary px-4 py-2 text-sm text-white font-medium hover:bg-primary/90 shadow-md shadow-primary/20 transition-all"
+            >
+              FAQ Builder
+            </Link>
           </div>
         </div>
       </div>

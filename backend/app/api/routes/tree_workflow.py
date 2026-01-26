@@ -99,29 +99,29 @@ def list_tree_workflows():
         for r in rows
     ]
 
-@router.post("/nodes")
-def create_tree_node(payload: TreeNodeCreate):
-    conn = get_connection()
-    cur = conn.cursor()
+# @router.post("/nodes")
+# def create_tree_node(payload: TreeNodeCreate):
+#     conn = get_connection()
+#     cur = conn.cursor()
 
-    cur.execute(
-        """
-        INSERT INTO tree_node (tree_workflow_id, value)
-        VALUES (%s, %s)
-        RETURNING id, value
-        """,
-        (str(payload.tree_workflow_id), payload.value)
-    )
+#     cur.execute(
+#         """
+#         INSERT INTO tree_node (tree_workflow_id, value)
+#         VALUES (%s, %s)
+#         RETURNING id, value
+#         """,
+#         (str(payload.tree_workflow_id), payload.value)
+#     )
 
-    row = cur.fetchone()
-    conn.commit()
-    cur.close()
-    conn.close()
+#     row = cur.fetchone()
+#     conn.commit()
+#     cur.close()
+#     conn.close()
 
-    return {
-        "id": row[0],
-        "value": row[1]
-    }
+#     return {
+#         "id": row[0],
+#         "value": row[1]
+#     }
 
 
 @router.get("/{tree_workflow_id}/nodes")
@@ -317,4 +317,28 @@ def delete_tree_workflow(tree_workflow_id: UUID):
     return {
         "status": "tree_workflow_deleted",
         "id": str(tree_workflow_id)
+    }
+
+@router.post("/")
+def create_tree_workflow(payload: TreeWorkflowCreate):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO tree_workflow (name)
+        VALUES (%s)
+        RETURNING id, name
+        """,
+        (payload.name,),
+    )
+
+    row = cur.fetchone()
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {
+        "id": row[0],
+        "name": row[1],
     }

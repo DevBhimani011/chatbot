@@ -1,112 +1,163 @@
+'use client';
+
+import { motion } from 'framer-motion';
+import { MessageCircle, Workflow, ArrowRight, Zap, Database } from 'lucide-react';
+import Link from 'next/link';
+
 export default function Home() {
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/80">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Chatbot Workflow
-            </h1>
-            <div className="flex gap-3">
-              <a
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-50 via-white to-white overflow-hidden selection:bg-primary/20">
+
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 glass-panel border-b-0 border-b-border/40">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2"
+            >
+              <div className="h-8 w-8 rounded-xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/30">
+                <MessageCircle size={18} />
+              </div>
+              <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
+                Chatbot Workflow
+              </h1>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex gap-4"
+            >
+              <Link
                 href="/chat"
-                className="rounded-lg bg-blue-500 px-4 py-2 text-white font-medium transition-all hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"
+                className="text-sm font-medium text-gray-600 hover:text-primary transition-colors py-2"
               >
                 Chat
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/workflow"
-                className="rounded-lg bg-indigo-500 px-4 py-2 text-white font-medium transition-all hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-700"
+                className="text-sm font-medium text-gray-600 hover:text-primary transition-colors py-2"
               >
                 Workflow
-              </a>
-            </div>
+              </Link>
+            </motion.div>
           </div>
         </div>
       </nav>
 
-      <main className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="rounded-2xl bg-white p-8 shadow-xl dark:bg-gray-800 sm:p-12">
-          <div className="mb-8 text-center">
-            <h2 className="text-4xl font-bold text-gray-900 dark:text-white sm:text-5xl">
-              Welcome to Your Chatbot Workflow
-            </h2>
-            <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
-              Build and manage intelligent conversational workflows with ease
-            </p>
+      <main>
+        {/* Hero Section */}
+        <section className="relative pt-20 pb-32 overflow-hidden">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
+            <motion.div
+              variants={container}
+              initial="hidden"
+              animate="show"
+              className="text-center max-w-3xl mx-auto"
+            >
+              <motion.div variants={item} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 text-primary text-xs font-semibold uppercase tracking-wide border border-primary/10 mb-8">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                </span>
+                Next Gen AI Workflow
+              </motion.div>
+
+              <motion.h1 variants={item} className="text-5xl sm:text-7xl font-bold tracking-tight text-gray-900 mb-8">
+                Build intelligent <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-indigo-400">conversational flows</span>
+              </motion.h1>
+
+              <motion.p variants={item} className="text-xl text-gray-600 mb-10 leading-relaxed">
+                Design, test, and deploy powerful chatbot workflows with our visual editor.
+                Seamlessly integrate logic and AI responses.
+              </motion.p>
+
+              <motion.div variants={item} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <Link
+                  href="/chat"
+                  className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-xl bg-primary px-8 font-medium text-white shadow-xl shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02]"
+                >
+                  <span className="mr-2">Start Chatting</span>
+                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
+                <Link
+                  href="/workflow"
+                  className="group inline-flex h-12 items-center justify-center rounded-xl bg-white px-8 font-medium text-gray-700 shadow-lg shadow-gray-200/50 border border-gray-100 transition-all hover:bg-gray-50 hover:border-gray-200 hover:scale-[1.02]"
+                >
+                  <Workflow size={18} className="mr-2 text-gray-500 group-hover:text-gray-700" />
+                  Visual Editor
+                </Link>
+              </motion.div>
+            </motion.div>
           </div>
 
-          <div className="grid gap-8 py-8 sm:grid-cols-2">
-            <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-blue-50 to-blue-100 p-6 dark:border-gray-700 dark:from-gray-700 dark:to-gray-600">
-              <div className="mb-3 text-3xl">💬</div>
-              <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
-                Chat Interface
-              </h3>
-              <p className="text-gray-700 dark:text-gray-300">
-                Interact with your static chatbot in a clean, modern chat interface
-              </p>
-              <a
-                href="/chat"
-                className="mt-4 inline-block rounded-lg bg-blue-500 px-4 py-2 text-white font-medium transition-all hover:bg-blue-600"
-              >
-                Start Chatting →
-              </a>
-            </div>
-
-            <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-indigo-50 to-indigo-100 p-6 dark:border-gray-700 dark:from-gray-700 dark:to-gray-600">
-              <div className="mb-3 text-3xl">⚙️</div>
-              <h3 className="mb-2 text-xl font-bold text-gray-900 dark:text-white">
-                Workflow Builder
-              </h3>
-              <p className="text-gray-700 dark:text-gray-300">
-                Design and manage complex workflows with an intuitive node-based editor
-              </p>
-              <a
-                href="/workflow"
-                className="mt-4 inline-block rounded-lg bg-indigo-500 px-4 py-2 text-white font-medium transition-all hover:bg-indigo-600"
-              >
-                Build Workflows →
-              </a>
-            </div>
+          {/* Background Decorative Elements */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full z-0 pointer-events-none">
+            <div className="absolute top-20 left-[20%] w-72 h-72 bg-purple-200/30 rounded-full blur-3xl mix-blend-multiply filter animate-blob"></div>
+            <div className="absolute top-20 right-[20%] w-72 h-72 bg-blue-200/30 rounded-full blur-3xl mix-blend-multiply filter animate-blob animation-delay-2000"></div>
+            <div className="absolute -bottom-8 left-[30%] w-72 h-72 bg-indigo-200/30 rounded-full blur-3xl mix-blend-multiply filter animate-blob animation-delay-4000"></div>
           </div>
+        </section>
 
-          <div className="mt-12 border-t border-gray-200 pt-8 dark:border-gray-700">
-            <h3 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
-              Features
-            </h3>
-            <ul className="grid gap-3 sm:grid-cols-2">
-              <li className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-sm font-bold text-white">
-                  ✓
-                </span>
-                Real-time chat interactions
-              </li>
-              <li className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-sm font-bold text-white">
-                  ✓
-                </span>
-                Visual workflow design
-              </li>
-              <li className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-sm font-bold text-white">
-                  ✓
-                </span>
-                Easy-to-use interface
-              </li>
-              <li className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-sm font-bold text-white">
-                  ✓
-                </span>
-                Persistent data storage
-              </li>
-            </ul>
+        {/* Features Section */}
+        <section className="py-24 bg-white/50 relative">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              {[
+                {
+                  icon: <MessageCircle className="w-6 h-6 text-blue-500" />,
+                  title: "Natural Conversations",
+                  desc: "Fluid interactions that feel human, powered by advanced language models."
+                },
+                {
+                  icon: <Workflow className="w-6 h-6 text-indigo-500" />,
+                  title: "Visual Builder",
+                  desc: "Drag-and-drop interface to create complex logic paths without writing code."
+                },
+                {
+                  icon: <Database className="w-6 h-6 text-purple-500" />,
+                  title: "Persistent Memory",
+                  desc: "Remember context across sessions for more personalized user experiences."
+                }
+              ].map((feature, i) => (
+                <div key={i} className="group p-8 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300">
+                  <div className="mb-4 h-12 w-12 rounded-lg bg-gray-50 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{feature.title}</h3>
+                  <p className="text-gray-500 leading-relaxed">{feature.desc}</p>
+                </div>
+              ))}
+            </motion.div>
           </div>
-        </div>
+        </section>
       </main>
 
-      <footer className="border-t border-gray-200 bg-white/50 py-8 dark:border-gray-700 dark:bg-gray-800/50">
-        <div className="mx-auto max-w-7xl px-4 text-center text-gray-600 dark:text-gray-400">
-          <p>© 2026 Chatbot Workflow. All rights reserved.</p>
+      <footer className="border-t border-gray-100 py-12 bg-white">
+        <div className="mx-auto max-w-7xl px-4 text-center">
+          <p className="text-gray-400 text-sm">© 2026 Chatbot Workflow. Designed for excellence.</p>
         </div>
       </footer>
     </div>
