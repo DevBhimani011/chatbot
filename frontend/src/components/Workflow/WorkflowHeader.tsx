@@ -9,9 +9,7 @@ export function WorkflowHeader() {
             <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
               Workflow Builder
             </h1>
-            <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold border border-blue-100">
-              BETA
-            </span>
+
           </div>
           <div className="flex gap-2">
             <Link
