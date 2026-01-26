@@ -6,6 +6,7 @@ import ReactFlow, {
   Background,
   Controls,
   MiniMap,
+  NodeDragHandler,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -23,6 +24,7 @@ type WorkflowCanvasProps = {
   onNodeClick: NodeMouseHandler;
   onEdgeClick: (event: any, edge: Edge) => void;
   onConnect: (connection: Connection) => void;
+  onNodeDragStop?: NodeDragHandler;
   nodeTypes: any;
 };
 
@@ -35,6 +37,7 @@ export function WorkflowCanvas({
   onNodeClick,
   onEdgeClick,
   onConnect,
+  onNodeDragStop,
   nodeTypes,
 }: WorkflowCanvasProps) {
   if (!selectedWorkflow) {
@@ -62,6 +65,7 @@ export function WorkflowCanvas({
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onConnect={onConnect}
+        onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         fitView
       >

@@ -9,6 +9,8 @@ import ReactFlow, {
   Controls,
   Edge,
   MiniMap,
+  Node,
+  NodeDragHandler,
   NodeMouseHandler,
   useEdgesState,
   useNodesState,
@@ -33,6 +35,8 @@ type FaqNodeData = {
 type TreeNode = {
   id: string;
   value: string;
+  position_x?: number;
+  position_y?: number;
 };
 
 type TreeEdge = {
@@ -89,7 +93,10 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
         return {
           id: n.id,
           data: { label: n.value ?? '', isSelected },
-          position: { x: 250, y: index * 150 },
+          position: {
+            x: n.position_x ?? 250,
+            y: n.position_y ?? index * 150
+          },
           type: 'default',
           selected: isSelected,
         };
@@ -225,6 +232,20 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
     (_: React.MouseEvent, edge: RFEdge) => {
       setSelectedEdgeId(edge.id);
       setSelectedNodeId(null);
+    },
+    []
+  );
+
+  const onNodeDragStop = useCallback(
+    async (_: any, node: Node) => {
+      await fetch(`${API_ENDPOINTS.TREE_NODES}/${node.id}/position`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          position_x: node.position.x,
+          position_y: node.position.y,
+        }),
+      });
     },
     []
   );
@@ -381,6 +402,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
               onEdgeClick={onEdgeClick}
               onPaneClick={onPaneClick}
               onConnect={onConnect}
+              onNodeDragStop={onNodeDragStop}
               nodeTypes={nodeTypes}
               fitView
               className="bg-gray-50"

@@ -131,7 +131,7 @@ def get_tree_nodes(tree_workflow_id: UUID):
 
     cur.execute(
         """
-        SELECT id, value
+        SELECT id, value, position_x, position_y
         FROM tree_node
         WHERE tree_workflow_id = %s
         """,
@@ -143,7 +143,12 @@ def get_tree_nodes(tree_workflow_id: UUID):
     conn.close()
 
     return [
-        {"id": r[0], "value": r[1]}
+        {
+            "id": r[0], 
+            "value": r[1],
+            "position_x": r[2],
+            "position_y": r[3]
+        }
         for r in rows
     ]
 

@@ -22,7 +22,12 @@ import {
 import { API_ENDPOINTS } from '@/config/api';
 
 type Workflow = { id: string; name: string };
-type NodeData = { id: string; value: string };
+type NodeData = {
+  id: string;
+  value: string;
+  position_x?: number;
+  position_y?: number;
+};
 
 const nodeTypes = { default: WorkflowNode };
 
@@ -64,7 +69,7 @@ export default function WorkflowPage() {
       nodesData.map((n, i) => ({
         id: n.id,
         data: { label: n.value || '(empty)' },
-        position: { x: 200, y: i * 150 },
+        position: { x: n.position_x ?? 200, y: n.position_y ?? i * 150 },
         type: 'default',
       }))
     );
@@ -81,69 +86,69 @@ export default function WorkflowPage() {
   /* ---------------- NODE ---------------- */
 
   const saveNode = async () => {
-  if (!selectedNodeId) return;
+    if (!selectedNodeId) return;
     console.log('Saving node:', selectedNodeId, editValue);
     console.log('API_URL:', API_ENDPOINTS.NODES); // Check what URL is actually being used
-  console.log('Saving node:', selectedNodeId, editValue);
-  try {
-    const response = await fetch(`${API_ENDPOINTS.NODES}/${selectedNodeId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: editValue }),
-    });
+    console.log('Saving node:', selectedNodeId, editValue);
+    try {
+      const response = await fetch(`${API_ENDPOINTS.NODES}/${selectedNodeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: editValue }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      setBackendNodes(n =>
+        n.map(x => (x.id === selectedNodeId ? { ...x, value: editValue } : x))
+      );
+
+      setNodes(n =>
+        n.map(x =>
+          x.id === selectedNodeId
+            ? { ...x, data: { label: editValue || '(empty)' } }
+            : x
+        )
+      );
+    } catch (error) {
+      console.error('Failed to save node:', error);
     }
-
-    setBackendNodes(n =>
-      n.map(x => (x.id === selectedNodeId ? { ...x, value: editValue } : x))
-    );
-
-    setNodes(n =>
-      n.map(x =>
-        x.id === selectedNodeId
-          ? { ...x, data: { label: editValue || '(empty)' } }
-          : x
-      )
-    );
-  } catch (error) {
-    console.error('Failed to save node:', error);
-  }
-};
+  };
 
   const addNextCard = async () => {
-  if (!selectedWorkflow) return;
+    if (!selectedWorkflow) return;
 
-  const res = await fetch(API_ENDPOINTS.NODES, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      workflow_id: selectedWorkflow.id,
-      value: '',
-    }),
-  });
+    const res = await fetch(API_ENDPOINTS.NODES, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workflow_id: selectedWorkflow.id,
+        value: '',
+      }),
+    });
 
-  const node = await res.json();
+    const node = await res.json();
 
-  // backend state
-  setBackendNodes(prev => [...prev, node]);
+    // backend state
+    setBackendNodes(prev => [...prev, node]);
 
-  // react-flow state
-  setNodes(prev => [
-    ...prev,
-    {
-      id: node.id,
-      data: { label: '(empty)' },
-      position: { x: 200, y: prev.length * 150 },
-      type: 'default',
-    },
-  ]);
+    // react-flow state
+    setNodes(prev => [
+      ...prev,
+      {
+        id: node.id,
+        data: { label: '(empty)' },
+        position: { x: 200, y: prev.length * 150 },
+        type: 'default',
+      },
+    ]);
 
-  // just select the new node
-  setSelectedNodeId(node.id);
-  setEditValue('');
-};
+    // just select the new node
+    setSelectedNodeId(node.id);
+    setEditValue('');
+  };
 
 
   const deleteNode = async () => {
@@ -213,18 +218,18 @@ export default function WorkflowPage() {
   };
 
   const onNodeDragStop = useCallback(
-  async (_: any, node: Node) => {
-    await fetch(`${API_ENDPOINTS.TREE_NODES}/${node.id}/position`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        position_x: node.position.x,
-        position_y: node.position.y,
-      }),
-    });
-  },
-  []
-);
+    async (_: any, node: Node) => {
+      await fetch(`${API_ENDPOINTS.NODES}/${node.id}/position`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          position_x: node.position.x,
+          position_y: node.position.y,
+        }),
+      });
+    },
+    []
+  );
 
 
   useEffect(() => {
@@ -252,6 +257,7 @@ export default function WorkflowPage() {
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
           onConnect={onConnect}
+          onNodeDragStop={onNodeDragStop}
           nodeTypes={nodeTypes}
         />
 
