@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chatbot Workflow",
+  title: "Chatbot",
   description: "Build and manage intelligent conversational workflows",
 };
 
