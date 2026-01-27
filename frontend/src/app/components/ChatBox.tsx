@@ -35,10 +35,22 @@ export default function ChatBox() {
     inputRef.current?.focus();
   }, []);
 
+  /* ---------------- SESSION MANAGEMENT ---------------- */
+  // generateUUID helper
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
+  const [sessionId] = useState(generateUUID);
+
   /* ---------------- TREE START ---------------- */
 
   useEffect(() => {
-    fetch(`${API_ENDPOINTS.CHAT}tree/start`)
+    if (!sessionId) return;
+    fetch(`${API_ENDPOINTS.CHAT}tree/start?session_id=${sessionId}`)
       .then(res => res.json())
       .then(data => {
         setMessages([
@@ -49,7 +61,7 @@ export default function ChatBox() {
           },
         ]);
       });
-  }, []);
+  }, [sessionId]);
 
   /* ---------------- STATIC CHAT ---------------- */
 
@@ -66,7 +78,10 @@ export default function ChatBox() {
       const res = await fetch(`${API_ENDPOINTS.CHAT}message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify({ 
+          message: userText,
+          session_id: sessionId 
+        }),
       });
 
       const data = await res.json();
@@ -77,7 +92,10 @@ export default function ChatBox() {
         const faqRes = await fetch(`${API_ENDPOINTS.CHAT}tree/next`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ value: data.value }),
+          body: JSON.stringify({ 
+            value: data.value,
+            session_id: sessionId
+          }),
         });
 
         const faqData = await faqRes.json();
@@ -91,7 +109,14 @@ export default function ChatBox() {
           },
         ]);
       } else {
-        setMessages(prev => [...prev, { sender: 'bot', text: data.text }]);
+        setMessages(prev => [
+          ...prev, 
+          { 
+            sender: 'bot', 
+            text: data.text,
+            buttons: data.buttons 
+          }
+        ]);
       }
     } catch {
       setMessages(prev => [
@@ -113,7 +138,10 @@ export default function ChatBox() {
     const res = await fetch(`${API_ENDPOINTS.CHAT}tree/next`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value }),
+      body: JSON.stringify({ 
+        value,
+        session_id: sessionId
+      }),
     });
 
     const data = await res.json();

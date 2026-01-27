@@ -88,6 +88,23 @@ def init_db() -> None:
         """
     )
 
+    # ------------------------------------------------------
+    # Chat History (Session-based)
+    # ------------------------------------------------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS chat_history (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            session_id TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+            content TEXT NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        """
+    )
+
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_chat_history_session_id ON chat_history(session_id);')
+
     # In case tables existed before, ensure new columns exist.
     # (Postgres supports IF NOT EXISTS for ADD COLUMN)
     cur.execute('ALTER TABLE node ADD COLUMN IF NOT EXISTS position_x DOUBLE PRECISION;')

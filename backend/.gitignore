@@ -7,3 +7,4 @@ __pycache__/
 # Specific pycache folders
 app/__pycache__/
 app/api/routes/__pycache__/
+app/db/__pycache__/
