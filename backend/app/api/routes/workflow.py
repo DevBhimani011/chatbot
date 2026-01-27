@@ -51,7 +51,7 @@ def get_workflow_nodes(workflow_id: str):
 
     cur.execute(
         """
-        SELECT id, value
+        SELECT id, value, position_x, position_y
         FROM node
         WHERE workflow_id = %s
         """,
@@ -66,7 +66,9 @@ def get_workflow_nodes(workflow_id: str):
     return [
         {
             "id": row[0],
-            "value": row[1]
+            "value": row[1],
+            "position_x": row[2],
+            "position_y": row[3]
         }
         for row in rows
     ]

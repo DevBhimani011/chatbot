@@ -99,29 +99,29 @@ def list_tree_workflows():
         for r in rows
     ]
 
-@router.post("/nodes")
-def create_tree_node(payload: TreeNodeCreate):
-    conn = get_connection()
-    cur = conn.cursor()
+# @router.post("/nodes")
+# def create_tree_node(payload: TreeNodeCreate):
+#     conn = get_connection()
+#     cur = conn.cursor()
 
-    cur.execute(
-        """
-        INSERT INTO tree_node (tree_workflow_id, value)
-        VALUES (%s, %s)
-        RETURNING id, value
-        """,
-        (str(payload.tree_workflow_id), payload.value)
-    )
+#     cur.execute(
+#         """
+#         INSERT INTO tree_node (tree_workflow_id, value)
+#         VALUES (%s, %s)
+#         RETURNING id, value
+#         """,
+#         (str(payload.tree_workflow_id), payload.value)
+#     )
 
-    row = cur.fetchone()
-    conn.commit()
-    cur.close()
-    conn.close()
+#     row = cur.fetchone()
+#     conn.commit()
+#     cur.close()
+#     conn.close()
 
-    return {
-        "id": row[0],
-        "value": row[1]
-    }
+#     return {
+#         "id": row[0],
+#         "value": row[1]
+#     }
 
 
 @router.get("/{tree_workflow_id}/nodes")
@@ -131,7 +131,7 @@ def get_tree_nodes(tree_workflow_id: UUID):
 
     cur.execute(
         """
-        SELECT id, value
+        SELECT id, value, position_x, position_y
         FROM tree_node
         WHERE tree_workflow_id = %s
         """,
@@ -143,7 +143,12 @@ def get_tree_nodes(tree_workflow_id: UUID):
     conn.close()
 
     return [
-        {"id": r[0], "value": r[1]}
+        {
+            "id": r[0], 
+            "value": r[1],
+            "position_x": r[2],
+            "position_y": r[3]
+        }
         for r in rows
     ]
 
@@ -317,4 +322,28 @@ def delete_tree_workflow(tree_workflow_id: UUID):
     return {
         "status": "tree_workflow_deleted",
         "id": str(tree_workflow_id)
+    }
+
+@router.post("/")
+def create_tree_workflow(payload: TreeWorkflowCreate):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO tree_workflow (name)
+        VALUES (%s)
+        RETURNING id, name
+        """,
+        (payload.name,),
+    )
+
+    row = cur.fetchone()
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {
+        "id": row[0],
+        "name": row[1],
     }
