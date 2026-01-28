@@ -5,3 +5,9 @@ python-dotenv
 pymupdf
 pytesseract
 Pillow
+pydantic
+requests
+minio
+pymilvus
+sentence-transformers
+python-multipart
