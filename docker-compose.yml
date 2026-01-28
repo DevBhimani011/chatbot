@@ -56,10 +56,43 @@ services:
     networks:
       - chatbot-network
 
+  postgres:
+    image: postgres:15
+    container_name: chatbot-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-chatbot_db}
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - chatbot-network
+
+  graphql-engine:
+    image: hasura/graphql-engine:v2.40.0
+    container_name: chatbot-hasura
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_started
+    restart: always
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-chatbot_db}
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_DEV_MODE: "true"
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
+    networks:
+      - chatbot-network
+
 volumes:
   etcd_data:
   minio_data:
   milvus_data:
+  postgres_data:
 
 networks:
   chatbot-network:
