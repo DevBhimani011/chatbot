@@ -88,11 +88,31 @@ services:
     networks:
       - chatbot-network
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: chatbot-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+    # Uncomment below if you have NVIDIA GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
 volumes:
   etcd_data:
   minio_data:
   milvus_data:
   postgres_data:
+  ollama_data:
 
 networks:
   chatbot-network:
