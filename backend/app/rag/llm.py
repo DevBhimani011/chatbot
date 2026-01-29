@@ -1,8 +1,9 @@
 import requests
 import os
+from app.core.config import settings
 
 # Use environment variable for Docker, fallback to localhost for local dev
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
+OLLAMA_URL = settings.OLLAMA_URL
 MODEL_NAME = "phi3"  # or mistral
 
 def generate_answer(context: str, question: str) -> str:
@@ -37,4 +38,11 @@ Answer:
     )
 
     response.raise_for_status()
-    return response.json()["response"].strip()
+    data = response.json()
+    
+    return {
+        "answer": data.get("response", "").strip(),
+        "prompt_tokens": data.get("prompt_eval_count", 0),
+        "response_tokens": data.get("eval_count", 0),
+        "total_tokens": data.get("prompt_eval_count", 0) + data.get("eval_count", 0)
+    }

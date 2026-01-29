@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.db.init_db import init_db
+from strawberry.fastapi import GraphQLRouter
+from app.graphql.schema import schema
 
 app = FastAPI(title="Static Chatbot API")
 
@@ -23,3 +25,6 @@ def health_check():
     return {"status": "ok"}
 
 app.include_router(api_router)
+
+graphql_app = GraphQLRouter(schema)
+app.include_router(graphql_app, prefix="/graphql") 

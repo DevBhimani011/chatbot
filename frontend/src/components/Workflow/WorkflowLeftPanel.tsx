@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { API_ENDPOINTS } from '@/config/api';
 import { Plus, Layout, FolderOpen } from 'lucide-react';
+import { gql, useMutation } from '@apollo/client';
+
+const CREATE_WORKFLOW = gql`
+  mutation CreateWorkflow($name: String!) {
+    createWorkflow(name: $name) {
+      id
+      name
+    }
+  }
+`;
 
 type Workflow = {
   id: string;
@@ -23,28 +33,14 @@ export function WorkflowLeftPanel({
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
+  const [createWorkflowMutation] = useMutation(CREATE_WORKFLOW);
+
   const handleCreateWorkflow = async () => {
     if (!name.trim()) return;
 
     setIsCreating(true);
     try {
-      const res = await fetch(API_ENDPOINTS.WORKFLOWS, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-
-      const workflow = await res.json();
-
-      // Create first empty node
-      await fetch(API_ENDPOINTS.NODES, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workflow_id: workflow.id,
-          value: '',
-        }),
-      });
+      await createWorkflowMutation({ variables: { name } });
 
       setName('');
       onRefresh();

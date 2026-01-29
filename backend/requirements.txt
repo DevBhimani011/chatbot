@@ -11,3 +11,4 @@ minio
 pymilvus
 sentence-transformers
 python-multipart
+strawberry-graphql[fastapi]

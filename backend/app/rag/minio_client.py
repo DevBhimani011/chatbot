@@ -1,10 +1,11 @@
 from minio import Minio
+from app.core.config import settings
 
 def get_minio_client():
     return Minio(
-        "localhost:9000",
-        access_key="minioadmin",
-        secret_key="minioadmin",
+        settings.MINIO_ENDPOINT,
+        access_key=settings.MINIO_ACCESS_KEY,
+        secret_key=settings.MINIO_SECRET_KEY,
         secure=False,
     )
 

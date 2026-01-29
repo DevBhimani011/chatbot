@@ -4,29 +4,9 @@ from app.db.session import get_connection
 
 router = APIRouter(prefix="/workflows", tags=["Workflows"])
 
-class WorkflowCreate(BaseModel):
-    name: str
 
-@router.post("/")
-def create_workflow(payload: WorkflowCreate):
-    conn = get_connection()
-    cur = conn.cursor()
 
-    cur.execute(
-        "INSERT INTO workflow (name) VALUES (%s) RETURNING id, name",
-        (payload.name,)
-    )
 
-    result = cur.fetchone()
-    conn.commit()
-
-    cur.close()
-    conn.close()
-
-    return {
-        "id": result[0],
-        "name": result[1]
-    }
 
 @router.get("/")
 def list_workflows():

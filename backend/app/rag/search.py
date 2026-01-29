@@ -1,3 +1,4 @@
+from app.core.config import settings
 from pymilvus import Collection, connections
 from app.rag.embeddings import embed_text
 
@@ -6,8 +7,8 @@ def search_similar_chunks(query: str, limit: int = 5):
     # Ensure Milvus connection exists
     connections.connect(
         alias="default",
-        host="localhost",
-        port="19530"
+        host=settings.MILVUS_HOST,
+        port=settings.MILVUS_PORT
     )
 
     collection = Collection("document_chunks")

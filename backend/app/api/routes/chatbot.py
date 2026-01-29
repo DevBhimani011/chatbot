@@ -13,6 +13,13 @@ from app.rag.pdf_loader import extract_text_from_pdf
 import io
 
 
+import logging
+import sys
+
+# Configure logging at the module level or globally in main.py
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', stream=sys.stdout)
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/chat", tags=["Chatbot"])
 
 
@@ -137,9 +144,21 @@ def static_chat(payload: StaticChatRequest):
             tree_res = get_tree_response(cur, node[0], payload.message)
             return log_and_return(tree_res)
             
-        rag_answer = answer_question(payload.message)
-        if rag_answer != "No answer found in the document.":
-            return log_and_return({"type": "rag", "text": rag_answer})
+        rag_response = answer_question(payload.message)
+        
+
+        
+        # Log token usage (Using print to ensure it appears in terminal)
+        print(f"------------ RAG TOKEN STATS ------------")
+        print(f"Session: {payload.session_id}")
+        print(f"Prompt Tokens: {rag_response.get('prompt_tokens', 0)}")
+        print(f"Response Tokens: {rag_response.get('response_tokens', 0)}")
+        print(f"Total Tokens: {rag_response.get('total_tokens', 0)}")
+        print(f"---------------------------------------")
+
+        rag_text = rag_response["answer"]
+        if rag_text != "No answer found in the document.":
+            return log_and_return({"type": "rag", "text": rag_text})
 
         return log_and_return({
             "type": "none",
@@ -330,6 +349,11 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     if not chunks:
         raise HTTPException(status_code=400, detail="Chunking failed")
+
+    # Log chunk stats
+    avg_chars = sum(len(c) for c in chunks) / len(chunks) if chunks else 0
+    logger.info(f"PDF processed: {len(chunks)} chunks created.")
+    logger.info(f"Average chunk details: {avg_chars:.1f} characters (approx {avg_chars/4:.1f} tokens).")
 
     # 4️⃣ Upload PDF to MinIO
     minio = get_minio_client()
