@@ -4,9 +4,9 @@ from pydantic import BaseModel
 from app.rag.minio_client import get_minio_client
 from app.rag.milvus_client import connect_milvus
 from pymilvus import Collection
-from app.rag.pdf_loader import extract_text_from_pdf
-from app.rag.chunking import chunk_text
-from app.rag.milvus_store import insert_chunks
+from app.rag.pdf_loader import extract_text_from_pdf, extract_tables_from_pdf
+from app.rag.chunking import chunk_text, table_rows_to_chunks
+from app.rag.milvus_store import insert_chunks, insert_table_rows
 from uuid import uuid4
 from urllib.parse import quote
 import io
@@ -130,14 +130,21 @@ def delete_document(object_name: str):
             try:
                 logger.info(f"🔍 Connecting to Milvus to delete chunks for document_id: {document_id}")
                 connect_milvus()
-                collection = Collection("document_chunks")
-                collection.load()
-                
-                # Delete all chunks with this document_id
+                # Delete all chunks with this document_id from both collections
                 expr = f'document_id == "{document_id}"'
                 logger.info(f"🗑️ Executing Milvus delete with expression: {expr}")
-                collection.delete(expr)
-                collection.flush()
+
+                for collection_name in ["document_chunks", "document_table_rows"]:
+                    try:
+                        collection = Collection(collection_name)
+                        collection.load()
+                        collection.delete(expr)
+                        collection.flush()
+                    except Exception as delete_error:
+                        logger.warning(
+                            f"⚠️ Error deleting from {collection_name}: {str(delete_error)}",
+                            exc_info=True,
+                        )
                 
                 logger.info(f"✅ Successfully deleted chunks from Milvus for document_id: {document_id}")
             except Exception as milvus_error:
@@ -173,6 +180,10 @@ async def upload_pdf(file: UploadFile = File(...)):
         # 2️⃣ Extract text
         logger.info(f"🔍 Extracting text from PDF: {file.filename}")
         full_text = extract_text_from_pdf(pdf_bytes)
+
+        # 2️⃣b Extract tables (digital PDFs)
+        logger.info(f"📑 Extracting tables from PDF: {file.filename}")
+        tables = extract_tables_from_pdf(pdf_bytes)
 
         if not full_text.strip():
             logger.error(f"❌ No text found in PDF: {file.filename}")
@@ -224,6 +235,16 @@ async def upload_pdf(file: UploadFile = File(...)):
             chunks=chunks,
         )
         logger.info(f"✅ Successfully stored chunks in Milvus")
+
+        # 6️⃣b Store table rows in Milvus
+        table_rows = table_rows_to_chunks(tables)
+        logger.info(f"💾 Storing {len(table_rows)} table rows in Milvus")
+        insert_table_rows(
+            document_id=document_id,
+            filename=file.filename,
+            rows=table_rows,
+        )
+        logger.info(f"✅ Successfully stored table rows in Milvus")
 
         logger.info(f"🎉 PDF upload completed successfully: {file.filename}")
         return {
