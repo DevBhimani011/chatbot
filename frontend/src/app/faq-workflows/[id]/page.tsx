@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import FAQWorkflowBuilder from '../FAQWorkflowBuilder';
+import { FAQWorkflowBuilder } from '../components';
 
 export default function Page() {
   const params = useParams<{ id: string }>();

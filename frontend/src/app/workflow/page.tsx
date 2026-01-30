@@ -17,7 +17,7 @@ import {
   WorkflowCanvas,
   WorkflowRightPanel,
   WorkflowHeader,
-} from '@/components/Workflow';
+} from './components';
 
 import { API_ENDPOINTS } from '@/config/api';
 
@@ -60,7 +60,7 @@ export default function WorkflowPage() {
     const nodesRes = await fetch(API_ENDPOINTS.WORKFLOW_NODES(wf.id));
     const nodesData: NodeData[] = await nodesRes.json();
 
-    const edgesRes = await fetch(API_ENDPOINTS.EDGES_BY_WORKFLOW(wf.id));
+    const edgesRes = await fetch(API_ENDPOINTS.WORKFLOW_EDGES(wf.id));
     const edgesData = await edgesRes.json();
 
     setBackendNodes(nodesData);
@@ -91,7 +91,7 @@ export default function WorkflowPage() {
     console.log('API_URL:', API_ENDPOINTS.NODES); // Check what URL is actually being used
     console.log('Saving node:', selectedNodeId, editValue);
     try {
-      const response = await fetch(`${API_ENDPOINTS.NODES}/${selectedNodeId}`, {
+      const response = await fetch(API_ENDPOINTS.NODE_BY_ID(selectedNodeId), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: editValue }),
@@ -154,7 +154,7 @@ export default function WorkflowPage() {
   const deleteNode = async () => {
     if (!selectedNodeId) return;
 
-    await fetch(`${API_ENDPOINTS.NODES}/${selectedNodeId}`, { method: 'DELETE' });
+    await fetch(API_ENDPOINTS.NODE_BY_ID(selectedNodeId), { method: 'DELETE' });
 
     setNodes(n => n.filter(x => x.id !== selectedNodeId));
     setEdges(e => e.filter(x => x.source !== selectedNodeId && x.target !== selectedNodeId));
@@ -166,7 +166,7 @@ export default function WorkflowPage() {
 
   const deleteEdge = async () => {
     if (!selectedEdgeId) return;
-    await fetch(`${API_ENDPOINTS.EDGES}/${selectedEdgeId}`, { method: 'DELETE' });
+    await fetch(API_ENDPOINTS.EDGE_BY_ID(selectedEdgeId), { method: 'DELETE' });
     setEdges(e => e.filter(x => x.id !== selectedEdgeId));
     setSelectedEdgeId(null);
   };
@@ -219,7 +219,7 @@ export default function WorkflowPage() {
 
   const onNodeDragStop = useCallback(
     async (_: any, node: Node) => {
-      await fetch(`${API_ENDPOINTS.NODES}/${node.id}/position`, {
+      await fetch(API_ENDPOINTS.NODE_POSITION(node.id), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

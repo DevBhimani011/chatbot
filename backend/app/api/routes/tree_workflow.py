@@ -99,31 +99,6 @@ def list_tree_workflows():
         for r in rows
     ]
 
-# @router.post("/nodes")
-# def create_tree_node(payload: TreeNodeCreate):
-#     conn = get_connection()
-#     cur = conn.cursor()
-
-#     cur.execute(
-#         """
-#         INSERT INTO tree_node (tree_workflow_id, value)
-#         VALUES (%s, %s)
-#         RETURNING id, value
-#         """,
-#         (str(payload.tree_workflow_id), payload.value)
-#     )
-
-#     row = cur.fetchone()
-#     conn.commit()
-#     cur.close()
-#     conn.close()
-
-#     return {
-#         "id": row[0],
-#         "value": row[1]
-#     }
-
-
 @router.get("/{tree_workflow_id}/nodes")
 def get_tree_nodes(tree_workflow_id: UUID):
     conn = get_connection()

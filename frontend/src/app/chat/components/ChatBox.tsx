@@ -49,7 +49,7 @@ export default function ChatBox() {
 
   useEffect(() => {
     if (!sessionId) return;
-    fetch(`${API_ENDPOINTS.CHAT}tree/start?session_id=${sessionId}`)
+    fetch(`${API_ENDPOINTS.CHAT}/tree/start?session_id=${sessionId}`)
       .then(res => res.json())
       .then(data => {
         setMessages([
@@ -74,7 +74,7 @@ export default function ChatBox() {
     setMessages(prev => [...prev, { sender: 'user', text: userText }]);
 
     try {
-      const res = await fetch(`${API_ENDPOINTS.CHAT}message`, {
+      const res = await fetch(`${API_ENDPOINTS.CHAT}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -88,7 +88,7 @@ export default function ChatBox() {
       if (data.type === 'static') {
         setMessages(prev => [...prev, { sender: 'bot', text: data.text }]);
       } else if (data.type === 'faq') {
-        const faqRes = await fetch(`${API_ENDPOINTS.CHAT}tree/next`, {
+        const faqRes = await fetch(`${API_ENDPOINTS.CHAT}/tree/next`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -134,7 +134,7 @@ export default function ChatBox() {
 
     setMessages(prev => [...prev, { sender: 'user', text: value }]);
 
-    const res = await fetch(`${API_ENDPOINTS.CHAT}tree/next`, {
+    const res = await fetch(`${API_ENDPOINTS.CHAT}/tree/next`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 

@@ -7,20 +7,21 @@ import ReactFlow, {
   Background,
   Connection,
   Controls,
-  Edge,
   MiniMap,
-  Node,
-  NodeDragHandler,
   NodeMouseHandler,
   useEdgesState,
   useNodesState,
+  Node,
 } from 'reactflow';
 import type { Edge as RFEdge } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Plus, Trash2, Save, Layout, FileText, Settings } from 'lucide-react';
+import { FileText } from 'lucide-react';
 
 import { API_ENDPOINTS } from '@/config/api';
-import { WorkflowHeader, WorkflowNode } from '@/components/Workflow';
+import { WorkflowHeader, WorkflowNode } from '../../workflow/components';
+import { FAQWorkflowLeftPanel, FAQWorkflowRightPanel } from './';
+
+const nodeTypes = { default: WorkflowNode };
 
 type FAQWorkflow = {
   id: string;
@@ -44,9 +45,6 @@ type TreeEdge = {
   from_node_id: string;
   to_node_id: string;
 };
-
-// Define nodeTypes outside component to prevent warnings
-const nodeTypes = { default: WorkflowNode };
 
 export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkflowId?: string }) {
   const router = useRouter();
@@ -329,52 +327,15 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
 
       <div className="flex flex-1 overflow-hidden">
         {/* LEFT PANEL */}
-        <div className="w-72 border-r border-gray-200 bg-gray-50/50 p-6 shadow-sm flex flex-col h-full">
-          <h2 className="mb-6 text-sm font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-2">
-            <Layout size={16} />
-            FAQ Workflows
-          </h2>
-
-          <div className="mb-4 flex flex-col gap-3">
-            <input
-              placeholder="New workflow name..."
-              value={name}
-              onChange={e => setName(e.target.value)}
-              disabled={isCreating}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition-all placeholder:text-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-100 disabled:opacity-50"
-            />
-            <button
-              type="button"
-              onClick={createWorkflow}
-              disabled={isCreating || !name.trim()}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-green-500/20 transition-all hover:bg-green-700 disabled:opacity-50 disabled:shadow-none"
-            >
-              <Plus size={16} />
-              Create
-            </button>
-          </div>
-
-          <div className="space-y-1 overflow-y-auto pr-1">
-            {workflows.length === 0 ? (
-              <div className="py-4 text-center">
-                <p className="text-sm text-gray-400">No workflows yet</p>
-              </div>
-            ) : (
-              workflows.map(wf => (
-                <button
-                  key={wf.id}
-                  onClick={() => selectWorkflow(wf)}
-                  className={`w-full rounded-lg px-4 py-2.5 text-left text-sm font-medium transition-all ${selectedWorkflow?.id === wf.id
-                    ? 'bg-white text-green-600 shadow-sm ring-1 ring-gray-200'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                    }`}
-                >
-                  {wf.name}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
+        <FAQWorkflowLeftPanel
+          workflows={workflows}
+          selectedWorkflow={selectedWorkflow}
+          workflowName={name}
+          isCreating={isCreating}
+          onWorkflowNameChange={setName}
+          onCreateWorkflow={createWorkflow}
+          onSelectWorkflow={selectWorkflow}
+        />
 
         {/* CANVAS */}
         <div className="flex-1 bg-gray-50">
@@ -415,87 +376,18 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
         </div>
 
         {/* RIGHT PANEL - Properties */}
-        <div className="w-80 border-l border-gray-200 bg-white p-6 shadow-xl shadow-gray-200/50 flex flex-col h-full overflow-y-auto">
-          <h2 className="mb-6 text-sm font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-2">
-            <Settings size={16} />
-            Properties
-          </h2>
-
-          {!selectedWorkflow ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center rounded-xl bg-gray-50 border border-dashed border-gray-200">
-              <p className="text-sm text-gray-400">Select a workflow first</p>
-            </div>
-          ) : !selectedNode ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center rounded-xl bg-gray-50 border border-dashed border-gray-200">
-              <p className="text-sm text-gray-400">Select a node to edit</p>
-            </div>
-          ) : (
-            <div className="space-y-4 animate-fadeIn">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  FAQ Content
-                </label>
-                <textarea
-                  value={editValue}
-                  onChange={e => setEditValue(e.target.value)}
-                  rows={8}
-                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition-all placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
-                  placeholder="Enter content..."
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={saveFaqNode}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-700 hover:shadow-blue-500/30"
-              >
-                <Save size={16} />
-                Save Changes
-              </button>
-            </div>
-          )}
-
-          <div className="mt-auto pt-6 border-t border-gray-100 space-y-3">
-            <button
-              onClick={addFaqNode}
-              disabled={!selectedWorkflow}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-green-500/20 transition-all hover:bg-green-700 disabled:opacity-50 disabled:shadow-none"
-            >
-              <Plus size={16} />
-              Add FAQ Node
-            </button>
-
-            {selectedNode && (
-              <button
-                onClick={deleteFaqNode}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600 transition-all hover:bg-red-100 border border-transparent hover:border-red-200"
-              >
-                <Trash2 size={16} />
-                Delete Node
-              </button>
-            )}
-
-            {selectedEdgeId && (
-              <button
-                onClick={deleteFaqEdge}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600 transition-all hover:bg-red-100 border border-transparent hover:border-red-200"
-              >
-                <Trash2 size={16} />
-                Delete Connection
-              </button>
-            )}
-
-            {selectedWorkflow && (
-              <button
-                onClick={deleteFaqWorkflow}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-500 transition-all hover:bg-gray-100 hover:text-red-700"
-              >
-                <Trash2 size={16} />
-                Delete Workflow
-              </button>
-            )}
-          </div>
-        </div>
+        <FAQWorkflowRightPanel
+          selectedWorkflow={selectedWorkflow}
+          selectedNode={selectedNode}
+          selectedEdgeId={selectedEdgeId}
+          editValue={editValue}
+          onEditValueChange={setEditValue}
+          onSaveNode={saveFaqNode}
+          onAddNode={addFaqNode}
+          onDeleteNode={deleteFaqNode}
+          onDeleteEdge={deleteFaqEdge}
+          onDeleteWorkflow={deleteFaqWorkflow}
+        />
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import ChatBox from '../components/ChatBox';
+import { ChatBox } from './components';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
