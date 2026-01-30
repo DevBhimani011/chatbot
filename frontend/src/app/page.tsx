@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { MessageCircle, Workflow, ArrowRight, Zap, Database } from 'lucide-react';
+import { MessageCircle, Workflow, ArrowRight, Zap, Database, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Home() {
@@ -55,6 +55,12 @@ export default function Home() {
                 className="text-sm font-medium text-gray-600 hover:text-primary transition-colors py-2"
               >
                 Workflow
+              </Link>
+              <Link
+                href="/knowledge-base"
+                className="text-sm font-medium text-gray-600 hover:text-primary transition-colors py-2"
+              >
+                Knowledge Base
               </Link>
             </motion.div>
           </div>
@@ -123,7 +129,7 @@ export default function Home() {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3"
+              className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4"
             >
               {[
                 {
@@ -135,6 +141,11 @@ export default function Home() {
                   icon: <Workflow className="w-6 h-6 text-indigo-500" />,
                   title: "Visual Builder",
                   desc: "Drag-and-drop interface to create complex logic paths without writing code."
+                },
+                {
+                  icon: <BookOpen className="w-6 h-6 text-green-500" />,
+                  title: "Knowledge Base",
+                  desc: "Upload and manage documents to power intelligent, context-aware responses."
                 },
                 {
                   icon: <Database className="w-6 h-6 text-purple-500" />,

@@ -2,6 +2,9 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 console.log('Loaded API_URL:', API_URL);
 export const API_ENDPOINTS = {
+  // Base URL
+  BASE_URL: API_URL,
+  
   // Workflows
   WORKFLOWS: `${API_URL}/workflows`,
   WORKFLOW_BY_ID: (id: string) => `${API_URL}/workflows/${id}`,

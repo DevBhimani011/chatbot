@@ -4,6 +4,7 @@ from app.api.routes import node
 from app.api.routes import edge
 from app.api.routes import chatbot
 from app.api.routes import tree_workflow
+from app.api.routes import documents
 
 
 
@@ -13,5 +14,6 @@ api_router.include_router(node.router)
 api_router.include_router(edge.router)
 api_router.include_router(chatbot.router)
 api_router.include_router(tree_workflow.router)
+api_router.include_router(documents.router)
 
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { API_ENDPOINTS } from '@/config/api';
-import { Send, Bot, User, Paperclip, FileText } from 'lucide-react';
+import { Send, Bot, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type ButtonOption = {
@@ -23,7 +23,6 @@ export default function ChatBox() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -158,29 +157,7 @@ export default function ChatBox() {
     setLoading(false);
   };
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    // Optimistic update
-    setMessages(prev => [...prev, { sender: 'user', text: `Uploaded PDF: ${file.name}` }]);
-
-    const res = await fetch(`${API_ENDPOINTS.CHAT}upload-pdf`, {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await res.json();
-
-    setMessages(prev => [...prev, { sender: 'bot', text: `PDF processed successfully. Created ${data.chunks} chunks.` }]);
-  };
 
   /* ---------------- UI ---------------- */
 
@@ -275,14 +252,6 @@ export default function ChatBox() {
       {/* INPUT */}
       <div className="border-t border-gray-100 bg-white p-4">
         <div className="flex items-end gap-2 bg-gray-50 rounded-2xl p-2 border border-gray-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all">
-          <button
-            onClick={handleUploadClick}
-            className="p-2 text-gray-400 hover:text-primary transition-colors rounded-xl hover:bg-white"
-            title="Upload PDF"
-          >
-            <Paperclip size={20} />
-          </button>
-
           <textarea
             ref={inputRef as any}
             value={input}
@@ -307,19 +276,6 @@ export default function ChatBox() {
           >
             <Send size={18} />
           </button>
-        </div>
-
-        <input
-          type="file"
-          accept="application/pdf"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          hidden
-        />
-        <div className="mt-2 flex justify-center">
-          <p className="text-[10px] text-gray-400 flex items-center gap-1">
-            <FileText size={10} /> Supports PDF uploads for context
-          </p>
         </div>
       </div>
     </div>
