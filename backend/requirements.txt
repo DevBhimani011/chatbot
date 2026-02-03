@@ -2,9 +2,6 @@ fastapi
 uvicorn
 psycopg2-binary
 python-dotenv
-pymupdf
-pytesseract
-Pillow
 pydantic
 requests
 minio
@@ -13,3 +10,6 @@ sentence-transformers
 python-multipart
 strawberry-graphql[fastapi]
 pdfplumber
+pdf2image
+pytesseract
+Pillow

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from app.rag.minio_client import get_minio_client
 from app.rag.milvus_client import connect_milvus
 from pymilvus import Collection
-from app.rag.pdf_loader import extract_text_from_pdf, extract_tables_from_pdf
+from app.rag.pdf_loader import extract_text_and_tables_from_pdf, extract_tables_from_pdf
 from app.rag.chunking import chunk_text, table_rows_to_chunks
 from app.rag.milvus_store import insert_chunks, insert_table_rows
 from uuid import uuid4
@@ -177,19 +177,40 @@ async def upload_pdf(file: UploadFile = File(...)):
         pdf_bytes = await file.read()
         logger.info(f"✅ Read {len(pdf_bytes)} bytes")
 
-        # 2️⃣ Extract text
-        logger.info(f"🔍 Extracting text from PDF: {file.filename}")
-        full_text = extract_text_from_pdf(pdf_bytes)
+        # 2️⃣ Extract text and tables in one pass (prevents duplication)
+        logger.info(f"🔍 Extracting text and tables from PDF: {file.filename}")
+        pages_text, tables = extract_text_and_tables_from_pdf(pdf_bytes)
+        full_text = "\n\n".join(pages_text.values())
 
-        # 2️⃣b Extract tables (digital PDFs)
-        logger.info(f"📑 Extracting tables from PDF: {file.filename}")
-        tables = extract_tables_from_pdf(pdf_bytes)
-
-        if not full_text.strip():
-            logger.error(f"❌ No text found in PDF: {file.filename}")
-            raise HTTPException(status_code=400, detail="No text found in PDF")
+        # Allow PDFs with tables even if they have no regular text
+        if not full_text.strip() and not tables:
+            logger.error(f"❌ No text or tables found in PDF: {file.filename}")
+            raise HTTPException(status_code=400, detail="No text or tables found in PDF")
         
-        logger.info(f"✅ Extracted {len(full_text)} characters of text")
+        # If no text but has tables, convert tables to text format
+        if not full_text.strip() and tables:
+            logger.info(f"✅ No regular text, converting {len(tables)} tables to text format")
+            table_texts = []
+            for table_data in tables:
+                # Convert table to markdown-style text
+                table_str = f"Table (Page {table_data.get('page', 'unknown')}):\n"
+                table = table_data.get('table', [])
+                if table:
+                    # Add headers if present
+                    if len(table) > 0:
+                        headers = table[0]
+                        table_str += " | ".join(str(h) for h in headers) + "\n"
+                        table_str += "-" * (len(headers) * 10) + "\n"
+                    # Add data rows
+                    for row in table[1:] if len(table) > 1 else table:
+                        table_str += " | ".join(str(cell) for cell in row) + "\n"
+                table_texts.append(table_str)
+            full_text = "\n\n".join(table_texts)
+            logger.info(f"✅ Generated {len(full_text)} characters from tables")
+        elif full_text.strip():
+            logger.info(f"✅ Extracted {len(full_text)} characters of text")
+        else:
+            logger.info(f"✅ No text extracted, but found {len(tables)} tables")
 
         # 3️⃣ Chunk text
         logger.info(f"✂️ Chunking text from: {file.filename}")

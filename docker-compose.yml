@@ -111,6 +111,8 @@ services:
   backend:
     build: ./backend
     container_name: chatbot-backend
+    env_file:
+      - ./backend/.env
     ports:
       - "0.0.0.0:8000:8000"
     environment:

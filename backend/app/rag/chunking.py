@@ -54,71 +54,103 @@ def table_rows_to_chunks(
     max_fields: int = 32,
 ) -> list[dict[str, Any]]:
     """Convert extracted pdf tables into row-level chunks.
-
-    Each returned item contains `text` plus metadata fields:
-    page_number, table_index, row_index.
+    
+    Each row is stored with its complete header information for better semantic search.
+    Handles complex tables with merged cells and varying structures.
     """
     results: list[dict[str, Any]] = []
 
     def _is_empty_row(row: list[str]) -> bool:
         return all((c or "").strip() == "" for c in row)
+    
+    def _clean_value(val: str) -> str:
+        """Clean and normalize cell values."""
+        if not val:
+            return ""
+        # Remove excessive whitespace
+        val = " ".join(val.split())
+        return val.strip()
 
     for table in tables or []:
         rows: list[list[str]] = table.get("rows") or []
         if not rows:
             continue
 
-        # Pick first non-empty row as header
+        # Find the first non-empty row as header
         header_row: list[str] | None = None
-        header_row_index: int | None = None
+        data_start_idx: int = 0
+        
         for idx, row in enumerate(rows):
             if not _is_empty_row(row):
-                header_row = [(c or "").strip() for c in row]
-                header_row_index = idx
+                header_row = [_clean_value(c or "") for c in row]
+                data_start_idx = idx + 1
                 break
 
-        if header_row is None:
+        if header_row is None or data_start_idx >= len(rows):
             continue
 
+        # Normalize header: assign default names to empty headers
         base_headers = [h if h else f"Column {i+1}" for i, h in enumerate(header_row)]
         base_headers = base_headers[:max_fields]
 
-        for absolute_row_index, row in enumerate(rows[(header_row_index + 1) :], start=1):
+        # Process each data row
+        for row_idx, row in enumerate(rows[data_start_idx:], start=1):
             if _is_empty_row(row):
                 continue
 
-            values = [(c or "").strip() for c in row][:max_fields]
-
+            # Clean all cell values
+            values = [_clean_value(c or "") for c in row][:max_fields]
+            
+            # Match header and value lengths
             headers = list(base_headers)
-            # Normalize lengths
             if len(values) < len(headers):
                 values.extend([""] * (len(headers) - len(values)))
             elif len(values) > len(headers):
+                # Add generic headers for extra columns
                 extra_headers = [f"Column {i+1}" for i in range(len(headers), len(values))]
                 headers = (headers + extra_headers)[:max_fields]
-                values = values[: len(headers)]
+                values = values[:len(headers)]
 
-            # Build a header-aware row representation (helps embeddings + LLM)
-            fields = "; ".join(
-                f"{headers[i]}: {values[i]}" for i in range(min(len(headers), len(values))) if headers[i]
-            )
+            # Build multiple representations for robust search
+            
+            # 1. Structured field list (key: value pairs)
+            field_pairs = []
+            for i in range(len(headers)):
+                if headers[i] and values[i]:
+                    field_pairs.append(f"{headers[i]}: {values[i]}")
+            fields_text = "; ".join(field_pairs)
+            
+            # 2. Header and row as pipe-separated
             header_line = " | ".join(headers)
             row_line = " | ".join(values)
+            
+            # 3. Natural language context for better embeddings
+            natural_sentences = []
+            for i in range(len(headers)):
+                if headers[i] and values[i]:
+                    natural_sentences.append(f"The {headers[i]} is {values[i]}")
+            natural_text = ". ".join(natural_sentences)
+            
+            # 4. Concatenate all values for text search
+            all_values = " ".join([v for v in values if v])
 
+            # Build final chunk with multiple formats
             chunk_text = (
-                "TABLE_ROW\n"
+                f"TABLE_ROW\n"
                 f"Page: {table.get('page_number')}\n"
                 f"Table: {table.get('table_index')}\n"
                 f"Headers: {header_line}\n"
                 f"Row: {row_line}\n"
-                f"Fields: {fields}"
+                f"Fields: {fields_text}\n"
+                f"Context: {natural_text}\n"
+                f"Content: {all_values}"
             ).strip()
 
             results.append({
                 "text": chunk_text,
                 "page_number": int(table.get("page_number") or 0),
                 "table_index": int(table.get("table_index") or 0),
-                "row_index": int(absolute_row_index),
+                "row_index": row_idx,
             })
 
     return results

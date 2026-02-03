@@ -9,7 +9,6 @@ from app.rag.milvus_store import insert_chunks
 from app.rag.minio_client import get_minio_client
 
 from uuid import uuid4
-from app.rag.pdf_loader import extract_text_from_pdf
 import io
 
 
