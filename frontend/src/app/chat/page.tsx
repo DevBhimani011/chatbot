@@ -1,25 +1,35 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChatBox } from './components';
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+import { AppNavbar } from '@/components/AppNavbar';
 
 export default function ChatPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is logged in
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      router.push('/login');
+      return;
+    }
+    setLoading(false);
+  }, [router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col bg-slate-50">
-      {/* Header */}
-      <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="p-2 -ml-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all">
-                <ArrowLeft size={20} />
-              </Link>
-              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
-                Chat Interface
-              </h1>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <AppNavbar />
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden p-4 sm:p-6 lg:p-8 flex justify-center">

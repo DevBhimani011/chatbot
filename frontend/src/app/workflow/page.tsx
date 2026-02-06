@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Node,
   Edge,
@@ -32,6 +33,7 @@ type NodeData = {
 const nodeTypes = { default: WorkflowNode };
 
 export default function WorkflowPage() {
+  const router = useRouter();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
 
@@ -233,8 +235,21 @@ export default function WorkflowPage() {
 
 
   useEffect(() => {
+    // Check if user is logged in and is admin
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      router.push('/login');
+      return;
+    }
+    
+    const user = JSON.parse(userData);
+    if (user.role !== 'admin') {
+      router.push('/chat'); // Redirect non-admins to chat
+      return;
+    }
+    
     fetchWorkflows();
-  }, []);
+  }, [router]);
 
   return (
     <div className="flex h-screen flex-col">

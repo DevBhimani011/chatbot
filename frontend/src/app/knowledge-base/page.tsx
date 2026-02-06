@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { API_ENDPOINTS } from '@/config/api';
-import { ArrowLeft, Upload, FileText, Trash2, Calendar, HardDrive, Search, X, Eye, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
+import { Upload, FileText, Trash2, Calendar, HardDrive, Search, X, Eye, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AppNavbar } from '@/components/AppNavbar';
 
 type Document = {
   object_name: string;
@@ -20,6 +21,7 @@ type Toast = {
 };
 
 export default function KnowledgeBasePage() {
+  const router = useRouter();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,8 +58,21 @@ export default function KnowledgeBasePage() {
   };
 
   useEffect(() => {
+    // Check if user is logged in and is admin
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      router.push('/login');
+      return;
+    }
+    
+    const user = JSON.parse(userData);
+    if (user.role !== 'admin') {
+      router.push('/chat'); // Redirect non-admins to chat
+      return;
+    }
+    
     fetchDocuments();
-  }, []);
+  }, [router]);
 
   // Filter documents based on search query
   useEffect(() => {
@@ -250,19 +265,14 @@ export default function KnowledgeBasePage() {
       </AnimatePresence>
 
       {/* Header */}
-      <nav className="border-b border-gray-200 bg-white/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/" className="p-2 -ml-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all">
-                <ArrowLeft size={20} />
-              </Link>
-              <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
-                Knowledge Base
-              </h1>
-            </div>
-            
-            {/* Upload Button */}
+      <AppNavbar />
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <div className="mx-auto max-w-7xl">
+          {/* Upload Section */}
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-900">Knowledge Base</h2>
             <label className="cursor-pointer">
               <input
                 type="file"
@@ -277,12 +287,6 @@ export default function KnowledgeBasePage() {
               </div>
             </label>
           </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-        <div className="mx-auto max-w-7xl">
           {/* Search Bar */}
           <div className="mb-6">
             <div className="relative max-w-md">

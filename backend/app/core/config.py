@@ -23,5 +23,9 @@ class Settings:
     GROK_API_KEY = os.getenv("GROK_API_KEY", "")  # Groq API key (keeping var name for compatibility)
     GROK_API_URL = os.getenv("GROK_API_URL", "https://api.groq.com/openai/v1/chat/completions")
     GROK_MODEL = os.getenv("GROK_MODEL", "llama-3.3-70b-versatile")  # or mixtral-8x7b-32768
+    
+    # Authentication configuration
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    DATABASE_URL = os.getenv("DATABASE_URL")
 
 settings = Settings()

@@ -3,6 +3,7 @@ uvicorn
 psycopg2-binary
 python-dotenv
 pydantic
+email-validator
 requests
 minio
 pymilvus
@@ -13,3 +14,4 @@ pdfplumber
 pdf2image
 pytesseract
 Pillow
+PyJWT==2.8.0

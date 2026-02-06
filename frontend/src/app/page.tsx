@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { MessageCircle, Workflow, ArrowRight, Zap, Database, BookOpen } from 'lucide-react';
+import { MessageCircle, Workflow, ArrowRight, Zap, Database, BookOpen, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Home() {
@@ -45,22 +45,16 @@ export default function Home() {
               className="flex gap-4"
             >
               <Link
-                href="/chat"
+                href="/login"
                 className="text-sm font-medium text-gray-600 hover:text-primary transition-colors py-2"
               >
-                Chat
+                Login
               </Link>
               <Link
-                href="/workflow"
-                className="text-sm font-medium text-gray-600 hover:text-primary transition-colors py-2"
+                href="/signup"
+                className="text-sm font-medium px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors"
               >
-                Workflow
-              </Link>
-              <Link
-                href="/knowledge-base"
-                className="text-sm font-medium text-gray-600 hover:text-primary transition-colors py-2"
-              >
-                Knowledge Base
+                Sign Up
               </Link>
             </motion.div>
           </div>
@@ -97,18 +91,18 @@ export default function Home() {
 
               <motion.div variants={item} className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                 <Link
-                  href="/chat"
+                  href="/login"
                   className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-xl bg-primary px-8 font-medium text-white shadow-xl shadow-primary/20 transition-all hover:bg-primary/90 hover:scale-[1.02]"
                 >
-                  <span className="mr-2">Start Chatting</span>
+                  <span className="mr-2">Get Started</span>
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <Link
-                  href="/workflow"
+                  href="/signup"
                   className="group inline-flex h-12 items-center justify-center rounded-xl bg-white px-8 font-medium text-gray-700 shadow-lg shadow-gray-200/50 border border-gray-100 transition-all hover:bg-gray-50 hover:border-gray-200 hover:scale-[1.02]"
                 >
-                  <Workflow size={18} className="mr-2 text-gray-500 group-hover:text-gray-700" />
-                  Visual Editor
+                  <UserPlus size={18} className="mr-2 text-gray-500 group-hover:text-gray-700" />
+                  Sign Up Free
                 </Link>
               </motion.div>
             </motion.div>
