@@ -7,6 +7,8 @@ from app.rag.chunking import chunk_text
 from app.rag.embeddings import embed_text
 from app.rag.milvus_store import insert_chunks
 from app.rag.minio_client import get_minio_client
+from app.core.redis import get_redis_client
+import json
 
 from uuid import uuid4
 import io
@@ -91,6 +93,10 @@ def static_chat(payload: StaticChatRequest):
         # ... Helper to log assistant reply ...
         def log_and_return(response_dict):
             text_content = format_bot_log(response_dict)
+            
+            # Re-obtain connection if closed (shouldn't happen here but safe check)
+            # Actually we reuse 'cur' from outer scope.
+            
             cur.execute(
                 """
                 INSERT INTO chat_history (session_id, role, content)
@@ -103,7 +109,17 @@ def static_chat(payload: StaticChatRequest):
             conn.close()
             return response_dict
 
-        # Try STATIC first
+        # ---------------- Check Redis Cache ----------------
+        redis_client = get_redis_client()
+        cache_key = f"chat_hash:{hash(payload.message.strip().lower())}"
+        
+        if redis_client:
+            cached_val = redis_client.get(cache_key)
+            if cached_val:
+                logger.info(f"🚀 [SOURCE: REDIS] Cache HIT for query: '{payload.message}'")
+                return log_and_return(json.loads(cached_val))
+
+        # ---------------- Try STATIC ----------------
         cur.execute(
             """
             SELECT child.value
@@ -119,11 +135,19 @@ def static_chat(payload: StaticChatRequest):
         row = cur.fetchone()
 
         if row:
-            return log_and_return({
+            logger.info(f"💾 [SOURCE: DATABASE - STATIC] Found answer for: '{payload.message}' -> Caching to Redis")
+            response_dict = {
                 "type": "static",
                 "text": row[0]
-            })
+            }
+            # Cache it
+            if redis_client:
+                redis_client.setex(cache_key, 600, json.dumps(response_dict))
+                logger.info(f"📦 [CACHE] Stored static response in Redis (TTL: 600s)")
+                
+            return log_and_return(response_dict)
 
+        # ---------------- Try TREE / FAQ ----------------
         cur.execute(
             "SELECT id FROM tree_node WHERE LOWER(value) = LOWER(%s) LIMIT 1",
             (payload.message,)
@@ -132,15 +156,23 @@ def static_chat(payload: StaticChatRequest):
         node = cur.fetchone()
 
         if node:
-            # DIRECTLY return tree response, no redirection
+            logger.info(f"🌳 [SOURCE: DATABASE - FAQ] Found tree node for: '{payload.message}' -> Caching to Redis")
+            # DIRECTLY return tree response
             tree_res = get_tree_response(cur, node[0], payload.message)
+            
+            # Cache it
+            if redis_client:
+                redis_client.setex(cache_key, 600, json.dumps(tree_res))
+                logger.info(f"📦 [CACHE] Stored FAQ response in Redis (TTL: 600s)")
+                
             return log_and_return(tree_res)
             
+        # ---------------- RAG Fallback (No Caching) ----------------
+        logger.info(f"🤖 [SOURCE: RAG] Attempting RAG generation for: '{payload.message}'")
         rag_response = answer_question(payload.message)
-        
 
         
-        # Log token usage (Using print to ensure it appears in terminal)
+        # Log token usage
         print(f"------------ RAG TOKEN STATS ------------")
         print(f"Session: {payload.session_id}")
         print(f"Prompt Tokens: {rag_response.get('prompt_tokens', 0)}")
@@ -150,6 +182,7 @@ def static_chat(payload: StaticChatRequest):
 
         rag_text = rag_response["answer"]
         if rag_text != "No answer found in the document.":
+            # NOTE: We specifically DO NOT CACHE RAG responses for now
             return log_and_return({"type": "rag", "text": rag_text})
 
         return log_and_return({
@@ -159,6 +192,10 @@ def static_chat(payload: StaticChatRequest):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        if 'cur' in locals() and not cur.closed:
+            cur.close()
+        if 'conn' in locals() and not conn.closed:
+            conn.close()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -219,6 +256,28 @@ def tree_next(payload: TreeChatRequest):
         )
         conn.commit()
 
+        # ---------------- Check Redis Cache ----------------
+        redis_client = get_redis_client()
+        cache_key = f"chat_hash:{hash(payload.value.strip().lower())}"
+
+        if redis_client:
+            cached_val = redis_client.get(cache_key)
+            if cached_val:
+                logger.info(f"🚀 [SOURCE: REDIS] Cache HIT for button: '{payload.value}'")
+                
+                # We need to log the assistant response even if it comes from cache
+                response = json.loads(cached_val)
+                cur.execute(
+                    """
+                    INSERT INTO chat_history (session_id, role, content)
+                    VALUES (%s, 'assistant', %s)
+                    """,
+                    (payload.session_id, format_bot_log(response))
+                )
+                conn.commit()
+                
+                return response
+
         # find clicked node
         cur.execute(
             "SELECT id FROM tree_node WHERE value = %s LIMIT 1",
@@ -235,7 +294,14 @@ def tree_next(payload: TreeChatRequest):
             }
 
         node_id = node[0]
+        logger.info(f"🌳 [SOURCE: DATABASE - FAQ] Found tree node for button: '{payload.value}' -> Caching to Redis")
+        
         response = get_tree_response(cur, node_id, payload.value)
+        
+        # Cache it
+        if redis_client:
+            redis_client.setex(cache_key, 600, json.dumps(response))
+            logger.info(f"📦 [CACHE] Stored FAQ response in Redis (TTL: 600s)")
         
         # Log ASSISTANT response
         cur.execute(

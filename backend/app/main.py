@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.db.init_db import init_db
+from app.rag.milvus_schema import create_all_collections
 from strawberry.fastapi import GraphQLRouter
 from app.graphql.schema import schema
 
@@ -23,6 +24,11 @@ app.add_middleware(
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
+    try:
+        create_all_collections()
+        print("✅ Milvus collections initialized")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize Milvus: {e}")
 
 @app.get("/")
 def health_check():

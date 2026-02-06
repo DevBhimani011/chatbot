@@ -3,8 +3,8 @@ from typing import List
 
 from typing import Any
 
-CHUNK_SIZE = 400
-CHUNK_OVERLAP = 80
+CHUNK_SIZE = 800
+CHUNK_OVERLAP = 160
 
 
 def clean_text(text: str) -> str:
