@@ -22,6 +22,13 @@ export const API_ENDPOINTS = {
 
   // Chat
   CHAT: `${API_URL}/chat`,
+  CHAT_TREE_START: `${API_URL}/chat/tree/start`,
+  CHAT_TREE_NEXT: `${API_URL}/chat/tree/next`,
+
+  // Auth
+  LOGIN: `${API_URL}/auth/login`,
+  SIGNUP: `${API_URL}/auth/signup`,
+  LOGOUT: `${API_URL}/auth/logout`,
 
   // Tree Workflows (FAQ)
   TREE_WORKFLOWS: `${API_URL}/tree-workflows`,

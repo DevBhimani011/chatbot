@@ -1,5 +1,5 @@
 import strawberry
-from typing import Optional
+from uuid import UUID
 
 @strawberry.type
 class WorkflowType:

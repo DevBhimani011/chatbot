@@ -57,6 +57,7 @@ Answer:"""
         logger.info(f"🌐 API URL: {GROK_API_URL}")
         logger.info(f"🤖 Model: {GROK_MODEL}")
         
+        # We now support streaming!
         response = requests.post(
             GROK_API_URL,
             headers={
@@ -64,6 +65,7 @@ Answer:"""
                 "Authorization": f"Bearer {GROK_API_KEY}"
             },
             json={
+                # "model": "lama-3.1-8b-instant",  # Updated model name if needed
                 "model": GROK_MODEL,
                 "messages": [
                     {"role": "system", "content": system_message},
@@ -71,44 +73,42 @@ Answer:"""
                 ],
                 "temperature": 0,
                 "max_tokens": 500,
-                "stream": False
+                "stream": True # Enable streaming
             },
-            timeout=30  # Groq is very fast
+            stream=True, # Requests stream
+            timeout=30
         )
         
-        # Log response details for debugging
         logger.info(f"📡 Response status: {response.status_code}")
-        if response.status_code != 200:
-            logger.error(f"❌ Response body: {response.text}")
-        
         response.raise_for_status()
-        data = response.json()
-        
-        # Extract answer from Grok response
-        answer = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-        usage = data.get("usage", {})
-        
-        # Log the response
-        logger.info("\n" + "=" * 80)
-        logger.info("📥 RESPONSE FROM GROQ:")
-        logger.info("=" * 80)
-        logger.info(answer)
-        logger.info("=" * 80)
-        logger.info(f"📊 Usage: {usage.get('prompt_tokens', 0)} prompt tokens, {usage.get('completion_tokens', 0)} response tokens")
-        logger.info("=" * 80 + "\n")
+
+        # Generator for streaming chunks
+        full_text = ""
+        for line in response.iter_lines():
+            if line:
+                line_text = line.decode('utf-8')
+                # SSE format: "data: {...}"
+                if line_text.startswith("data: "):
+                    data_str = line_text[6:]
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        import json
+                        chunk_json = json.loads(data_str)
+                        content = chunk_json.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                        if content:
+                            full_text += content
+                            yield content
+                    except json.JSONDecodeError:
+                        pass
         
         return {
-            "answer": answer,
-            "prompt_tokens": usage.get("prompt_tokens", 0),
-            "response_tokens": usage.get("completion_tokens", 0),
-            "total_tokens": usage.get("total_tokens", 0)
+            "answer": full_text,
+            "prompt_tokens": 0, # Cannot count easily in stream
+            "response_tokens": 0,
+            "total_tokens": 0
         }
         
     except requests.exceptions.RequestException as e:
         logger.error(f"❌ Groq API error: {str(e)}")
-        return {
-            "answer": f"Error calling Groq API: {str(e)}",
-            "prompt_tokens": 0,
-            "response_tokens": 0,
-            "total_tokens": 0
-        }
+        yield f"Error calling Groq API: {str(e)}"

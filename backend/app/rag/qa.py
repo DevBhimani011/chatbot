@@ -73,6 +73,5 @@ def answer_question(question: str) -> dict:
     logger.info(f"{'='*80}\n")
 
     # 4️⃣ Generate answer using LLM
-    response = generate_answer(context=context, question=question)
-    
-    return response
+    # generate_answer now returns a generator if successful
+    return generate_answer(context=context, question=question)

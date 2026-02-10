@@ -101,6 +101,18 @@ services:
     networks:
       - chatbot-network
 
+  rabbitmq:
+    image: rabbitmq:3.11-management
+    container_name: chatbot-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - chatbot-network
+
   backend:
     build:
       context: ./backend
@@ -128,6 +140,8 @@ services:
       - MILVUS_PORT=19530
       # Redis
       - REDIS_URL=redis://redis:6379/0
+      # RabbitMQ
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       # Groq
       - GROK_API_KEY=${GROK_API_KEY}
       - GROK_API_URL=https://api.groq.com/openai/v1/chat/completions
@@ -140,6 +154,52 @@ services:
       - milvus
       - minio
       - redis
+    networks:
+      - chatbot-network
+    restart: always
+
+  worker:
+    build:
+      context: ./backend
+    container_name: chatbot-worker
+    command: python run_worker.py
+    volumes:
+      - ./backend:/app
+      # Map hugginface cache to host, so model download persists across rebuilds
+      - huggingface_cache:/root/.cache/huggingface
+    environment:
+      # Database
+      - DB_HOST=postgres
+      - DB_NAME=chatbot_db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_PORT=5432
+      # MinIO
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET_NAME=chatbot-documents
+      # Milvus
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
+      # RabbitMQ
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      # Groq
+      - GROK_API_KEY=${GROK_API_KEY}
+      - GROK_API_URL=https://api.groq.com/openai/v1/chat/completions
+      - GROK_MODEL=llama-3.3-70b-versatile
+      # Auth
+      - SECRET_KEY=your-secret-key-change-in-production-must-be-at-least-32-characters-long
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/chatbot_db
+    depends_on:
+      - postgres
+      - milvus
+      - minio
+      - redis
+      - rabbitmq
+      - backend
     networks:
       - chatbot-network
     restart: always
