@@ -109,11 +109,12 @@ export default function KnowledgeBasePage() {
         throw new Error('Upload failed');
       }
 
-      const data = await res.json();
-      showToast(`PDF uploaded successfully! ${data.chunks} chunks created.`, 'success');
+
       
-      // Refresh document list
-      await fetchDocuments();
+      showToast('File uploaded successfully. Processing started in background.', 'success');
+      // Refresh list to see if it appears (unlikely immediately but good practice)
+      fetchDocuments();
+      
     } catch (error) {
       console.error('Error uploading file:', error);
       showToast('Error uploading file. Please try again.', 'error');
@@ -313,6 +314,7 @@ export default function KnowledgeBasePage() {
               </p>
             )}
           </div>
+
 
           {loading ? (
             <div className="flex items-center justify-center h-64">

@@ -45,8 +45,8 @@ export function AppNavbar() {
 
   const navLinks = [
     { href: '/chat', label: 'Chat', icon: MessageCircle, show: true },
-    { href: '/workflow', label: 'Workflow', icon: Workflow, show: isAdmin },
-    { href: '/faq-workflows', label: 'FAQ Workflows', icon: Workflow, show: isAdmin },
+    { href: '/workflow', label: 'FAQ', icon: Workflow, show: isAdmin },
+    { href: '/faq-workflows', label: 'Workflows', icon: Workflow, show: isAdmin },
     { href: '/knowledge-base', label: 'Knowledge Base', icon: BookOpen, show: isAdmin },
   ];
 

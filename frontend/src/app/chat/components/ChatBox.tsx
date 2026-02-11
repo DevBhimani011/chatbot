@@ -25,6 +25,10 @@ export default function ChatBox() {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [currentResponse, setCurrentResponse] = useState('');
   const [isConnected, setIsConnected] = useState(false);
+  
+  // Search Suggestions State
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,17 +53,18 @@ export default function ChatBox() {
     });
   };
 
+  // Volatile session ID - generates new one on every mount
   const [sessionId] = useState(() => generateUUID());
   
   // Log session ID once on mount
   useEffect(() => {
-    console.log('📋 Chat Session ID:', sessionId);
+    if (sessionId) console.log('📋 Chat Session ID:', sessionId);
   }, [sessionId]);
 
   /* ---------------- LOAD INITIAL FAQ BUTTONS ---------------- */
   useEffect(() => {
     // Only load if messages are empty
-    if (messages.length > 0) return;
+    if (messages.length > 0 || !sessionId) return;
     
     const loadFAQ = async () => {
       try {
@@ -158,29 +163,77 @@ export default function ChatBox() {
       } else {
           setLoading(false);
           
-          // Start or continue streaming
-          setCurrentResponse(prev => {
-              const newText = prev + data;
-              
-              // Update the message directly without causing infinite loop
+          let parsedData = null;
+          try {
+             // Try to parse as JSON (e.g. for buttons)
+             if (typeof data === 'string' && data.trim().startsWith('{')) {
+                 parsedData = JSON.parse(data);
+             }
+          } catch (e) {
+             // Not JSON, assume streaming text
+          }
+
+          if (parsedData && parsedData.type === 'buttons') {
+              // Handle structured button response
               setMessages(msgs => {
+                  return [...msgs, { 
+                      sender: 'bot', 
+                      text: parsedData.text,
+                      buttons: parsedData.buttons 
+                  }];
+              });
+              // We don't update streaming text for buttons, treat as complete message
+          } else if (parsedData && parsedData.type === 'text') {
+             // Handle simple text structured response
+              const text = parsedData.text;
+              
+              setMessages(msgs => {
+                  // If we are already streaming a message, append/replace?
+                  // Actually if it sends {"type": "text"}, it's likely a complete message or a chunk.
+                  // For now, let's treat it as a new full message if we aren't streaming, 
+                  // or append if we are.
+                  // BUT the backend sends "Thinking..." first which resets index.
+                  
                   if (streamingMessageIndexRef.current === -1) {
-                      // Create new bot message
-                      streamingMessageIndexRef.current = msgs.length;
-                      return [...msgs, { sender: 'bot', text: newText }];
+                        streamingMessageIndexRef.current = msgs.length;
+                        return [...msgs, { sender: 'bot', text: text }];
                   } else {
-                      // Update existing bot message
-                      const updated = [...msgs];
-                      updated[streamingMessageIndexRef.current] = {
-                          ...updated[streamingMessageIndexRef.current],
-                          text: newText
-                      };
-                      return updated;
+                       // Append or Replace? 
+                       // If it is a full "text" type, it might be the whole answer.
+                       // Let's assume it replaces/sets the content.
+                       const updated = [...msgs];
+                       updated[streamingMessageIndexRef.current] = {
+                           ...updated[streamingMessageIndexRef.current],
+                           text: text
+                       };
+                       return updated;
                   }
               });
-              
-              return newText;
-          });
+          } else {
+              // Assume streaming text chunk
+              setCurrentResponse(prev => {
+                  const newText = prev + data;
+                  
+                  // Update the message directly without causing infinite loop
+                  setMessages(msgs => {
+                      if (streamingMessageIndexRef.current === -1) {
+                          // Create new bot message
+                          streamingMessageIndexRef.current = msgs.length;
+                          return [...msgs, { sender: 'bot', text: newText }];
+                      } else {
+                          // Update existing bot message
+                          const updated = [...msgs];
+                          updated[streamingMessageIndexRef.current] = {
+                              ...updated[streamingMessageIndexRef.current],
+                              text: newText
+                          };
+                          return updated;
+                      }
+                  });
+                  
+                  return newText;
+              });
+          }
       }
     };
 
@@ -208,22 +261,61 @@ export default function ChatBox() {
   }, [sessionId]);
 
 
-  const sendMessage = async () => {
-    if (!input.trim() || !socket || socket.readyState !== WebSocket.OPEN) {
+  /* ---------------- SEARCH SUGGESTIONS ---------------- */
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      // Only search if input has meaningful content (at least 2 chars)
+      if (input.trim().length > 1) {
+        try {
+          const response = await fetch(`${API_ENDPOINTS.BASE_URL}/chat/suggestions?query=${encodeURIComponent(input)}`);
+          if (response.ok) {
+            const data = await response.json();
+            // Only show if we have results and the input hasn't been cleared/sent
+            if (data.length > 0 && input.trim()) {
+              setSuggestions(data);
+              setShowSuggestions(true);
+            } else {
+              setShowSuggestions(false);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching suggestions:", error);
+        }
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [input]);
+
+  const handleSuggestionClick = (suggestion: string) => {
+    sendMessage(suggestion);
+    setShowSuggestions(false);
+  };
+
+
+  const sendMessage = async (textOverride?: string) => {
+    const textToSend = textOverride || input;
+    
+    if (!textToSend.trim() || !socket || socket.readyState !== WebSocket.OPEN) {
       console.warn('Cannot send message: socket not ready', socket?.readyState);
       return;
     }
 
-    const userText = input;
     setInput('');
+    setSuggestions([]);
+    setShowSuggestions(false);
+    
     setCurrentResponse(''); // Reset stream buffer
     streamingMessageIndexRef.current = -1; // Reset streaming index
     
     // Add User Message
-    setMessages(prev => [...prev, { sender: 'user', text: userText }]);
+    setMessages(prev => [...prev, { sender: 'user', text: textToSend }]);
     
     // Send via WebSocket
-    socket.send(userText);
+    socket.send(textToSend);
   };
 
   /* ---------------- BUTTON HANDLING ---------------- */
@@ -393,32 +485,61 @@ export default function ChatBox() {
       </div>
 
       {/* INPUT */}
-      <div className="border-t border-gray-100 bg-white p-4">
-        <div className="flex items-end gap-2 bg-gray-50 rounded-2xl p-2 border border-gray-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all">
-          <textarea
-            ref={inputRef as any}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-              }
-            }}
-            placeholder="Type a message..."
-            disabled={loading && !currentResponse && false} // Allow typing while streaming
-            rows={1}
-            className="flex-1 bg-transparent px-2 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none max-h-32"
-            style={{ minHeight: '44px' }}
-          />
+      <div className="border-t border-gray-100 bg-white p-4 relative">
+        <div className="relative">
+          {/* Suggestions Popup */}
+          <AnimatePresence>
+            {showSuggestions && suggestions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="absolute bottom-full left-0 w-full mb-4 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-20"
+              >
+                <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Suggestions
+                </div>
+                <div className="max-h-60 overflow-y-auto p-2 space-y-1">
+                  {suggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-primary/5 hover:text-primary rounded-xl transition-colors border border-transparent hover:border-primary/10"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          <button
-            onClick={sendMessage}
-            disabled={!input.trim() || !isConnected}
-            className="p-2 bg-primary text-white rounded-xl shadow-lg shadow-primary/30 hover:bg-primary/90 disabled:opacity-50 disabled:shadow-none transition-all"
-          >
-            <Send size={18} />
-          </button>
+          <div className="flex items-end gap-2 bg-gray-50 rounded-2xl p-2 border border-gray-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all">
+            <textarea
+              ref={inputRef as any}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="Type a message..."
+              disabled={loading && !currentResponse && false} // Allow typing while streaming
+              rows={1}
+              className="flex-1 bg-transparent px-2 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none max-h-32"
+              style={{ minHeight: '44px' }}
+            />
+
+            <button
+              onClick={() => sendMessage()}
+              disabled={!input.trim() || !isConnected}
+              className="p-2 bg-primary text-white rounded-xl shadow-lg shadow-primary/30 hover:bg-primary/90 disabled:opacity-50 disabled:shadow-none transition-all"
+            >
+              <Send size={18} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

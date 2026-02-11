@@ -58,6 +58,43 @@ def format_bot_log(response):
 
 # -------------------- TREE CHAT --------------------
 
+@router.get("/suggestions")
+def get_suggestions(query: str):
+    conn = get_connection()
+    cur = conn.cursor()
+    
+    # Simple ILIKE search for suggestions
+    cur.execute(
+        """
+        SELECT DISTINCT value
+        FROM (
+            -- Questions from Workflow (Node -> Edge)
+            SELECT n.value
+            FROM node n
+            JOIN edge e ON n.id = e.from_node_id
+            WHERE n.value ILIKE %s
+            
+            UNION
+            
+            -- Questions from Tree Workflow (TreeNode -> TreeEdge)
+            SELECT tn.value
+            FROM tree_node tn
+            JOIN tree_edge te ON tn.id = te.from_node_id
+            WHERE tn.value ILIKE %s
+        ) AS suggestions
+        ORDER BY value
+        LIMIT 5
+        """,
+        (f"%{query}%", f"%{query}%")
+    )
+    
+    rows = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    return [r[0] for r in rows]
+
 @router.get("/tree/start")
 def tree_start(session_id: str):
     conn = get_connection()
@@ -77,7 +114,7 @@ def tree_start(session_id: str):
 
     response = {
         "type": "buttons",
-        "text": "FAQs",
+        "text": "Want to know about:",
         "buttons": [{"label": r[1], "value": r[1]} for r in rows]
     }
 

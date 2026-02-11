@@ -4,9 +4,7 @@ from pydantic import BaseModel
 from app.rag.minio_client import get_minio_client
 from app.rag.milvus_client import connect_milvus
 from pymilvus import Collection
-from app.rag.pdf_loader import extract_text_and_tables_from_pdf, extract_tables_from_pdf
-from app.rag.chunking import chunk_text, table_rows_to_chunks
-from app.rag.milvus_store import insert_chunks, insert_table_rows
+from app.core.queue import get_mq_client
 from uuid import uuid4
 from urllib.parse import quote
 import io
@@ -47,6 +45,10 @@ def list_documents():
         documents = []
         
         for obj in objects:
+            # Skip files that are still processing
+            if obj.object_name.startswith("processing/"):
+                continue
+                
             documents.append({
                 "object_name": obj.object_name,
                 "filename": obj.object_name.split("_", 1)[1] if "_" in obj.object_name else obj.object_name,
@@ -164,7 +166,7 @@ def delete_document(object_name: str):
 
 @router.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
-    """Upload and process a PDF document"""
+    """Upload PDF and queue for processing"""
     logger.info(f"📤 Uploading PDF: {file.filename}")
     
     if not file.filename.lower().endswith(".pdf"):
@@ -177,59 +179,11 @@ async def upload_pdf(file: UploadFile = File(...)):
         pdf_bytes = await file.read()
         logger.info(f"✅ Read {len(pdf_bytes)} bytes")
 
-        # 2️⃣ Extract text and tables in one pass (prevents duplication)
-        logger.info(f"🔍 Extracting text and tables from PDF: {file.filename}")
-        pages_text, tables = extract_text_and_tables_from_pdf(pdf_bytes)
-        full_text = "\n\n".join(pages_text.values())
-
-        # Allow PDFs with tables even if they have no regular text
-        if not full_text.strip() and not tables:
-            logger.error(f"❌ No text or tables found in PDF: {file.filename}")
-            raise HTTPException(status_code=400, detail="No text or tables found in PDF")
-        
-        # If no text but has tables, convert tables to text format
-        if not full_text.strip() and tables:
-            logger.info(f"✅ No regular text, converting {len(tables)} tables to text format")
-            table_texts = []
-            for table_data in tables:
-                # Convert table to markdown-style text
-                table_str = f"Table (Page {table_data.get('page', 'unknown')}):\n"
-                table = table_data.get('table', [])
-                if table:
-                    # Add headers if present
-                    if len(table) > 0:
-                        headers = table[0]
-                        table_str += " | ".join(str(h) for h in headers) + "\n"
-                        table_str += "-" * (len(headers) * 10) + "\n"
-                    # Add data rows
-                    for row in table[1:] if len(table) > 1 else table:
-                        table_str += " | ".join(str(cell) for cell in row) + "\n"
-                table_texts.append(table_str)
-            full_text = "\n\n".join(table_texts)
-            logger.info(f"✅ Generated {len(full_text)} characters from tables")
-        elif full_text.strip():
-            logger.info(f"✅ Extracted {len(full_text)} characters of text")
-        else:
-            logger.info(f"✅ No text extracted, but found {len(tables)} tables")
-
-        # 3️⃣ Chunk text
-        logger.info(f"✂️ Chunking text from: {file.filename}")
-        chunks = chunk_text(full_text)
-
-        if not chunks:
-            logger.error(f"❌ Chunking failed for: {file.filename}")
-            raise HTTPException(status_code=400, detail="Chunking failed")
-
-        # Log chunk stats
-        avg_chars = sum(len(c) for c in chunks) / len(chunks) if chunks else 0
-        logger.info(f"✅ Created {len(chunks)} chunks")
-        logger.info(f"📊 Average chunk size: {avg_chars:.1f} characters (~{avg_chars/4:.1f} tokens)")
-
-        # 4️⃣ Generate document_id
+        # 2️⃣ Generate document_id
         document_id = str(uuid4())
         logger.info(f"🆔 Generated document_id: {document_id}")
 
-        # 5️⃣ Upload PDF to MinIO
+        # 3️⃣ Upload PDF to MinIO
         logger.info(f"☁️ Uploading to MinIO: {file.filename}")
         minio = get_minio_client()
         bucket = "documents"
@@ -238,7 +192,9 @@ async def upload_pdf(file: UploadFile = File(...)):
             logger.info(f"📦 Creating bucket: {bucket}")
             minio.make_bucket(bucket)
 
-        object_name = f"{document_id}_{file.filename}"
+        # Prepend 'processing/' directory to hidden it from list
+        object_name = f"processing/{document_id}_{file.filename}"
+        
         minio.put_object(
             bucket_name=bucket,
             object_name=object_name,
@@ -248,31 +204,20 @@ async def upload_pdf(file: UploadFile = File(...)):
         )
         logger.info(f"✅ Uploaded to MinIO as: {object_name}")
 
-        # 6️⃣ Store chunks in Milvus
-        logger.info(f"💾 Storing {len(chunks)} chunks in Milvus")
-        insert_chunks(
-            document_id=document_id,
-            filename=file.filename,
-            chunks=chunks,
-        )
-        logger.info(f"✅ Successfully stored chunks in Milvus")
-
-        # 6️⃣b Store table rows in Milvus
-        table_rows = table_rows_to_chunks(tables)
-        logger.info(f"💾 Storing {len(table_rows)} table rows in Milvus")
-        insert_table_rows(
-            document_id=document_id,
-            filename=file.filename,
-            rows=table_rows,
-        )
-        logger.info(f"✅ Successfully stored table rows in Milvus")
-
-        logger.info(f"🎉 PDF upload completed successfully: {file.filename}")
-        return {
-            "status": "success",
-            "filename": file.filename,
-            "chunks": len(chunks),
+        # 4️⃣ Enqueue Task
+        logger.info(f"📨 Queueing processing task for: {file.filename}")
+        mq = await get_mq_client()
+        await mq.publish_message("pdf_queue", {
             "document_id": document_id,
+            "filename": file.filename,
+            "object_name": object_name
+        })
+
+        return {
+            "status": "processing",
+            "message": "PDF upload accepted and processing started",
+            "document_id": document_id,
+            "filename": file.filename,
             "object_name": object_name
         }
     
