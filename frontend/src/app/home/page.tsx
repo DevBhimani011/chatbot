@@ -31,7 +31,6 @@ export default function HomePage() {
     try {
       await fetch('http://localhost:8000/auth/logout', {
         method: 'POST',
-        credentials: 'include',
       });
     } catch (err) {
       console.error('Logout error:', err);

@@ -32,6 +32,11 @@ class Settings:
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     # RabbitMQ configuration
+    # RabbitMQ configuration
     RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
+
+    # Swagger Auth
+    DOCS_USER = os.getenv("DOCS_USER", "admin")
+    DOCS_PASSWORD = os.getenv("DOCS_PASSWORD", "admin")
 
 settings = Settings()

@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from uuid import UUID
 from app.db.session import get_connection
+from app.api.deps import get_current_user, get_current_admin_user
 
-router = APIRouter(prefix="/workflows", tags=["Workflows"])
+router = APIRouter(prefix="/workflows", tags=["Workflows"], dependencies=[Depends(get_current_admin_user)])
 
 # ==================== MODELS ====================
 

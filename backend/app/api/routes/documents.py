@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from app.rag.minio_client import get_minio_client
 from app.rag.milvus_client import connect_milvus
 from pymilvus import Collection
 from app.core.queue import get_mq_client
+from app.api.deps import get_current_user, get_current_admin_user
 from uuid import uuid4
 from urllib.parse import quote
 import io
@@ -19,7 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/documents", tags=["Documents"])
+router = APIRouter(prefix="/documents", tags=["Documents"], dependencies=[Depends(get_current_admin_user)])
 
 
 class DocumentInfo(BaseModel):

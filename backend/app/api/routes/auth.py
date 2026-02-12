@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from app.db.session import get_connection
-from app.core.security import generate_jwt
+from app.core.security import generate_jwt, verify_password, get_password_hash
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -22,13 +23,15 @@ class UserResponse(BaseModel):
     email: str
     role: str
     access_token: str
+    token_type: str = "bearer"
 
 # -------------------- ROUTES --------------------
 
 @router.post("/login", response_model=UserResponse)
-def login(request: LoginRequest, response: Response):
+def login(request: LoginRequest):
     """
-    Authenticate user and return JWT token in HTTP-only cookie
+    Authenticate user and return JWT token.
+    Supports seamless migration from plain-text to hashed passwords.
     """
     conn = get_connection()
     cur = conn.cursor()
@@ -46,29 +49,19 @@ def login(request: LoginRequest, response: Response):
         
         user_id, username, email, db_password, role = user
         
-        # Verify password (plain text comparison - should use bcrypt in production!)
-        if request.password != db_password:
+        if not verify_password(request.password, db_password):
             raise HTTPException(status_code=401, detail="Invalid credentials")
         
         # Generate JWT token
         token = generate_jwt(str(user_id), role, email)
-        
-        # Set HTTP-only cookie
-        response.set_cookie(
-            key="access_token",
-            value=token,
-            httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="lax",
-            max_age=60 * 60 * 24,  # 24 hours
-        )
         
         return {
             "user_id": str(user_id),
             "username": username,
             "email": email,
             "role": role,
-            "access_token": token
+            "access_token": token,
+            "token_type": "bearer"
         }
     
     finally:
@@ -77,9 +70,9 @@ def login(request: LoginRequest, response: Response):
 
 
 @router.post("/signup", response_model=UserResponse)
-def signup(request: SignupRequest, response: Response):
+def signup(request: SignupRequest):
     """
-    Register new user and return JWT token in HTTP-only cookie
+    Register new user and return JWT token
     """
     conn = get_connection()
     cur = conn.cursor()
@@ -90,6 +83,9 @@ def signup(request: SignupRequest, response: Response):
         if cur.fetchone():
             raise HTTPException(status_code=400, detail="Email already registered")
         
+        # Hash the password
+        hashed_password = get_password_hash(request.password)
+        
         # Insert new user (default role is 'user')
         cur.execute(
             """
@@ -97,7 +93,7 @@ def signup(request: SignupRequest, response: Response):
             VALUES (%s, %s, %s, 'user')
             RETURNING id
             """,
-            (request.username, request.email, request.password)
+            (request.username, request.email, hashed_password)
         )
         user_id = cur.fetchone()[0]
         conn.commit()
@@ -105,22 +101,13 @@ def signup(request: SignupRequest, response: Response):
         # Generate JWT token
         token = generate_jwt(str(user_id), 'user', request.email)
         
-        # Set HTTP-only cookie
-        response.set_cookie(
-            key="access_token",
-            value=token,
-            httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="lax",
-            max_age=60 * 60 * 24,  # 24 hours
-        )
-        
         return {
             "user_id": str(user_id),
             "username": request.username,
             "email": request.email,
             "role": "user",
-            "access_token": token
+            "access_token": token,
+            "token_type": "bearer"
         }
     
     finally:
@@ -129,9 +116,54 @@ def signup(request: SignupRequest, response: Response):
 
 
 @router.post("/logout")
-def logout(response: Response):
+def logout():
     """
-    Clear authentication cookie
+    Client-side logout is sufficient for JWT.
     """
-    response.delete_cookie(key="access_token")
     return {"message": "Logged out successfully"}
+
+
+@router.post("/login-json", include_in_schema=False)
+def login_for_swagger(form_data: OAuth2PasswordRequestForm = Depends()):
+    """
+    Dedicated endpoint for Swagger UI OAuth2 login.
+    Swagger sends data as form-data (username, password).
+    """
+    # Create the LoginRequest object expected by our logic
+    try:
+        # In OAuth2 form, username field contains the email
+        request = LoginRequest(email=form_data.username, password=form_data.password)
+        
+        # Reuse existing login logic
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        try:
+            cur.execute(
+                "SELECT id, username, email, password, role FROM users WHERE email = %s",
+                (request.email,)
+            )
+            user = cur.fetchone()
+            
+            if not user:
+                raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+            user_id, username, email, db_password, role = user
+            
+            # Verify password
+            if not verify_password(request.password, db_password):
+                 raise HTTPException(status_code=401, detail="Invalid credentials")
+            
+            token = generate_jwt(str(user_id), role, email)
+            
+            return {
+                "access_token": token,
+                "token_type": "bearer"
+            }
+        
+        finally:
+            cur.close()
+            conn.close()
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

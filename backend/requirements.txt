@@ -17,3 +17,5 @@ Pillow
 PyJWT==2.8.0
 redis
 aio-pika
+passlib
+bcrypt==3.2.2

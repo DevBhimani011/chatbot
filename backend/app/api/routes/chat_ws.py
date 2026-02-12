@@ -1,7 +1,9 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from app.core.redis import get_redis_client
 from app.core.queue import get_mq_client
 from app.db.session import get_connection
+from app.core.config import settings
+import jwt
 import json
 import asyncio
 import logging
@@ -9,7 +11,7 @@ import logging
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-
+# ... (WebSocketHandler class remains same) ...
 
 class WebSocketHandler:
     def __init__(self, websocket: WebSocket, session_id: str):
@@ -153,6 +155,24 @@ class WebSocketHandler:
                 logger.error(f"❌ Cleanup error: {e}")
 
 @router.websocket("/ws/{session_id}")
-async def websocket_endpoint(websocket: WebSocket, session_id: str):
+async def websocket_endpoint(websocket: WebSocket, session_id: str, token: str = Query(...)):
+    """
+    WebSocket endpoint with Query Param Authentication
+    Usage: ws://host/chat/ws/{session_id}?token=JWT_TOKEN
+    """
+    # 1. Validate Token
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("sub")
+        if user_id is None:
+            logger.warning(f"❌ WebSocket Auth Failed: No user_id in token")
+            await websocket.close(code=4003) # Forbidden
+            return
+    except Exception as e:
+        logger.error(f"❌ WebSocket Auth Failed: {e}")
+        await websocket.close(code=4003)
+        return
+
+    # 2. Proceed if valid
     handler = WebSocketHandler(websocket, session_id)
     await handler.run()

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.db.session import get_connection
 from app.core.redis import get_redis_client
+from app.api.deps import get_current_user
 import json
 import logging
 import sys
@@ -11,7 +12,7 @@ import sys
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/chat", tags=["Chatbot"])
+router = APIRouter(prefix="/chat", tags=["Chatbot"], dependencies=[Depends(get_current_user)])
 
 
 # -------------------- MODELS --------------------

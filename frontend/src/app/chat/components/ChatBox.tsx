@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { API_ENDPOINTS } from '@/config/api';
+import { auth } from '@/lib/auth';
 import { Send, Bot, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -71,7 +72,7 @@ export default function ChatBox() {
         console.log('🔄 Loading FAQ buttons from:', `${API_ENDPOINTS.CHAT_TREE_START}?session_id=${sessionId}`);
         
         const response = await fetch(`${API_ENDPOINTS.CHAT_TREE_START}?session_id=${sessionId}`, {
-          credentials: 'include',
+          headers: auth.getAuthHeaders(),
         });
         
         console.log('📡 FAQ Response status:', response.status, response.statusText);
@@ -122,11 +123,13 @@ export default function ChatBox() {
         const protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
         // Construct WS URL: protocol // host / path
         // Note: apiUrl.host includes port if present
-        wsUrl = `${protocol}//${apiUrl.host}/chat/ws/${sessionId}`;
+        const token = auth.getToken();
+        wsUrl = `${protocol}//${apiUrl.host}/chat/ws/${sessionId}?token=${token}`;
     } catch (e) {
         // Fallback if URL parsing fails
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${protocol}//localhost:8000/chat/ws/${sessionId}`;
+        const token = auth.getToken();
+        wsUrl = `${protocol}//localhost:8000/chat/ws/${sessionId}?token=${token}`;
         console.error("Failed to parse API_URL for WebSocket, using fallback:", e);
     }
     
@@ -267,7 +270,9 @@ export default function ChatBox() {
       // Only search if input has meaningful content (at least 2 chars)
       if (input.trim().length > 1) {
         try {
-          const response = await fetch(`${API_ENDPOINTS.BASE_URL}/chat/suggestions?query=${encodeURIComponent(input)}`);
+          const response = await fetch(`${API_ENDPOINTS.BASE_URL}/chat/suggestions?query=${encodeURIComponent(input)}`, {
+             headers: auth.getAuthHeaders()
+          });
           if (response.ok) {
             const data = await response.json();
             // Only show if we have results and the input hasn't been cleared/sent
@@ -330,8 +335,7 @@ export default function ChatBox() {
       // Call tree/next endpoint
       const response = await fetch(API_ENDPOINTS.CHAT_TREE_NEXT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: auth.getAuthHeaders(),
         body: JSON.stringify({
           value: value,
           session_id: sessionId

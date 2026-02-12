@@ -23,7 +23,6 @@ export default function SignupPage() {
       const response = await fetch('http://localhost:8000/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ username, email, password }),
       });
 
