@@ -21,6 +21,7 @@ import {
 } from './components';
 
 import { API_ENDPOINTS } from '@/config/api';
+import { auth } from '@/lib/auth';
 
 type Workflow = { id: string; name: string };
 type NodeData = {
@@ -50,8 +51,16 @@ export default function WorkflowPage() {
   /* ---------------- LOAD ---------------- */
 
   const fetchWorkflows = async () => {
-    const res = await fetch(API_ENDPOINTS.WORKFLOWS);
-    setWorkflows(await res.json());
+    try {
+      const res = await fetch(API_ENDPOINTS.WORKFLOWS, {
+        headers: auth.getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to fetch workflows');
+      setWorkflows(await res.json());
+    } catch (err) {
+      console.error(err);
+      setWorkflows([]);
+    }
   };
 
   const loadWorkflow = async (wf: Workflow) => {
@@ -59,10 +68,14 @@ export default function WorkflowPage() {
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
 
-    const nodesRes = await fetch(API_ENDPOINTS.WORKFLOW_NODES(wf.id));
+    const nodesRes = await fetch(API_ENDPOINTS.WORKFLOW_NODES(wf.id), {
+      headers: auth.getAuthHeaders(),
+    });
     const nodesData: NodeData[] = await nodesRes.json();
 
-    const edgesRes = await fetch(API_ENDPOINTS.WORKFLOW_EDGES(wf.id));
+    const edgesRes = await fetch(API_ENDPOINTS.WORKFLOW_EDGES(wf.id), {
+      headers: auth.getAuthHeaders(),
+    });
     const edgesData = await edgesRes.json();
 
     setBackendNodes(nodesData);
@@ -95,7 +108,7 @@ export default function WorkflowPage() {
     try {
       const response = await fetch(API_ENDPOINTS.NODE_BY_ID(selectedNodeId), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: auth.getAuthHeaders(),
         body: JSON.stringify({ value: editValue }),
       });
 
@@ -124,7 +137,7 @@ export default function WorkflowPage() {
 
     const res = await fetch(API_ENDPOINTS.NODES, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: auth.getAuthHeaders(),
       body: JSON.stringify({
         workflow_id: selectedWorkflow.id,
         value: '',
@@ -156,7 +169,10 @@ export default function WorkflowPage() {
   const deleteNode = async () => {
     if (!selectedNodeId) return;
 
-    await fetch(API_ENDPOINTS.NODE_BY_ID(selectedNodeId), { method: 'DELETE' });
+    await fetch(API_ENDPOINTS.NODE_BY_ID(selectedNodeId), { 
+      method: 'DELETE',
+      headers: auth.getAuthHeaders()
+    });
 
     setNodes(n => n.filter(x => x.id !== selectedNodeId));
     setEdges(e => e.filter(x => x.source !== selectedNodeId && x.target !== selectedNodeId));
@@ -168,7 +184,10 @@ export default function WorkflowPage() {
 
   const deleteEdge = async () => {
     if (!selectedEdgeId) return;
-    await fetch(API_ENDPOINTS.EDGE_BY_ID(selectedEdgeId), { method: 'DELETE' });
+    await fetch(API_ENDPOINTS.EDGE_BY_ID(selectedEdgeId), { 
+      method: 'DELETE',
+      headers: auth.getAuthHeaders()
+    });
     setEdges(e => e.filter(x => x.id !== selectedEdgeId));
     setSelectedEdgeId(null);
   };
@@ -178,7 +197,7 @@ export default function WorkflowPage() {
 
     const res = await fetch(API_ENDPOINTS.EDGES, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: auth.getAuthHeaders(),
       body: JSON.stringify({
         workflow_id: selectedWorkflow.id,
         from_node_id: connection.source,
@@ -197,6 +216,7 @@ export default function WorkflowPage() {
 
     await fetch(API_ENDPOINTS.WORKFLOW_BY_ID(selectedWorkflow.id), {
       method: 'DELETE',
+      headers: auth.getAuthHeaders(),
     });
 
     setSelectedWorkflow(null);
@@ -223,7 +243,7 @@ export default function WorkflowPage() {
     async (_: any, node: Node) => {
       await fetch(API_ENDPOINTS.NODE_POSITION(node.id), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: auth.getAuthHeaders(),
         body: JSON.stringify({
           position_x: node.position.x,
           position_y: node.position.y,

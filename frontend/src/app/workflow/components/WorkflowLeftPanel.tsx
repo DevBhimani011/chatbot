@@ -1,16 +1,7 @@
 import { useState } from 'react';
 import { API_ENDPOINTS } from '@/config/api';
 import { Plus, Layout, FolderOpen } from 'lucide-react';
-import { gql, useMutation } from '@apollo/client';
-
-const CREATE_WORKFLOW = gql`
-  mutation CreateWorkflow($name: String!) {
-    createWorkflow(name: $name) {
-      id
-      name
-    }
-  }
-`;
+import { auth } from '@/lib/auth';
 
 type Workflow = {
   id: string;
@@ -33,14 +24,18 @@ export function WorkflowLeftPanel({
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  const [createWorkflowMutation] = useMutation(CREATE_WORKFLOW);
-
   const handleCreateWorkflow = async () => {
     if (!name.trim()) return;
 
     setIsCreating(true);
     try {
-      await createWorkflowMutation({ variables: { name } });
+      const res = await fetch(API_ENDPOINTS.WORKFLOWS, {
+        method: 'POST',
+        headers: auth.getAuthHeaders(),
+        body: JSON.stringify({ name }),
+      });
+
+      if (!res.ok) throw new Error('Failed to create workflow');
 
       setName('');
       onRefresh();

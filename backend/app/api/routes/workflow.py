@@ -47,6 +47,45 @@ def list_workflows():
     ]
 
 
+class WorkflowCreate(BaseModel):
+    name: str
+
+@router.post("/")
+def create_workflow(payload: WorkflowCreate):
+    """Create a new workflow"""
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        # 1. Create Workflow
+        cur.execute(
+            "INSERT INTO workflow (name) VALUES (%s) RETURNING id, name",
+            (payload.name,)
+        )
+        wf_row = cur.fetchone()
+        wf_id = wf_row[0]
+        wf_name = wf_row[1]
+
+        # 2. Create Initial Node
+        cur.execute(
+            """
+            INSERT INTO node (workflow_id, value, position_x, position_y)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (str(wf_id), "", 100, 100)
+        )
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+    return {"id": str(wf_id), "name": wf_name}
+
+
 @router.get("/{workflow_id}/nodes")
 def get_workflow_nodes(workflow_id: str):
     """Get all nodes for a workflow"""
