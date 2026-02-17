@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { API_ENDPOINTS } from '@/config/api';
+import { auth } from '@/lib/auth';
 import { Upload, FileText, Trash2, Calendar, HardDrive, Search, X, Eye, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppNavbar } from '@/components/AppNavbar';
@@ -45,7 +46,9 @@ export default function KnowledgeBasePage() {
   const fetchDocuments = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_ENDPOINTS.BASE_URL}/documents/list`);
+      const res = await fetch(`${API_ENDPOINTS.BASE_URL}/documents/list`, {
+        headers: auth.getAuthHeaders(),
+      });
       const data = await res.json();
       setDocuments(data.documents || []);
       setFilteredDocuments(data.documents || []);
@@ -100,8 +103,15 @@ export default function KnowledgeBasePage() {
       const formData = new FormData();
       formData.append('file', file);
 
+      const token = auth.getToken();
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`${API_ENDPOINTS.BASE_URL}/documents/upload-pdf`, {
         method: 'POST',
+        headers,
         body: formData,
       });
 
@@ -138,6 +148,7 @@ export default function KnowledgeBasePage() {
       setDeleting(objectName);
       const res = await fetch(`${API_ENDPOINTS.BASE_URL}/documents/delete/${encodeURIComponent(objectName)}`, {
         method: 'DELETE',
+        headers: auth.getAuthHeaders(),
       });
 
       if (!res.ok) {
@@ -157,9 +168,34 @@ export default function KnowledgeBasePage() {
     }
   };
 
-  const handleViewDocument = (objectName: string) => {
-    const url = `${API_ENDPOINTS.BASE_URL}/documents/download/${encodeURIComponent(objectName)}`;
-    window.open(url, '_blank');
+  const handleViewDocument = async (objectName: string) => {
+    try {
+      showToast('Loading document...', 'info');
+      const token = auth.getToken();
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(
+        `${API_ENDPOINTS.BASE_URL}/documents/download/${encodeURIComponent(objectName)}`,
+        { headers }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      // Clean up the object URL after a delay
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+    } catch (error) {
+      console.error('Error viewing document:', error);
+      showToast('Error loading document', 'error');
+    }
   };
 
   const formatFileSize = (bytes: number) => {

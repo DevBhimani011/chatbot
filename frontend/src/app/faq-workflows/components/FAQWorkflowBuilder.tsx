@@ -18,6 +18,7 @@ import 'reactflow/dist/style.css';
 import { FileText } from 'lucide-react';
 
 import { API_ENDPOINTS } from '@/config/api';
+import { auth } from '@/lib/auth';
 import { WorkflowHeader, WorkflowNode } from '../../workflow/components';
 import { FAQWorkflowLeftPanel, FAQWorkflowRightPanel } from './';
 
@@ -69,7 +70,9 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
   );
 
   const fetchWorkflows = useCallback(async () => {
-    const res = await fetch(API_ENDPOINTS.TREE_WORKFLOWS);
+    const res = await fetch(API_ENDPOINTS.TREE_WORKFLOWS, {
+      headers: auth.getAuthHeaders(),
+    });
     const data = await res.json();
     if (Array.isArray(data)) setWorkflows(data);
   }, []);
@@ -77,8 +80,12 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
   const loadGraph = useCallback(
     async (workflowId: string) => {
       const [nodesRes, edgesRes] = await Promise.all([
-        fetch(`${API_ENDPOINTS.TREE_WORKFLOWS}/${workflowId}/nodes`),
-        fetch(`${API_ENDPOINTS.TREE_WORKFLOWS}/${workflowId}/edges`),
+        fetch(`${API_ENDPOINTS.TREE_WORKFLOWS}/${workflowId}/nodes`, {
+          headers: auth.getAuthHeaders(),
+        }),
+        fetch(`${API_ENDPOINTS.TREE_WORKFLOWS}/${workflowId}/edges`, {
+          headers: auth.getAuthHeaders(),
+        }),
       ]);
 
       const nodesData: TreeNode[] = (await nodesRes.json()) ?? [];
@@ -129,7 +136,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
     try {
       const res = await fetch(API_ENDPOINTS.TREE_WORKFLOWS, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: auth.getAuthHeaders(),
         body: JSON.stringify({ name }),
       });
       const wf = await res.json();
@@ -138,7 +145,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
       // create first empty FAQ node (mirrors normal workflow behavior)
       await fetch(API_ENDPOINTS.TREE_NODES, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: auth.getAuthHeaders(),
         body: JSON.stringify({ tree_workflow_id: wf.id, value: '' }),
       });
 
@@ -155,7 +162,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
 
     const res = await fetch(API_ENDPOINTS.TREE_NODES, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: auth.getAuthHeaders(),
       body: JSON.stringify({ tree_workflow_id: selectedWorkflow.id, value: '' }),
     });
     if (!res.ok) return;
@@ -182,7 +189,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
     if (!selectedNodeId) return;
     const res = await fetch(`${API_ENDPOINTS.TREE_NODES}/${selectedNodeId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: auth.getAuthHeaders(),
       body: JSON.stringify({ value: editValue }),
     });
     if (!res.ok) return;
@@ -210,7 +217,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
 
       const res = await fetch(API_ENDPOINTS.TREE_EDGES, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: auth.getAuthHeaders(),
         body: JSON.stringify({
           tree_workflow_id: selectedWorkflow.id,
           from_node_id: connection.source,
@@ -238,7 +245,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
     async (_: any, node: Node) => {
       await fetch(`${API_ENDPOINTS.TREE_NODES}/${node.id}/position`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: auth.getAuthHeaders(),
         body: JSON.stringify({
           position_x: node.position.x,
           position_y: node.position.y,
@@ -253,6 +260,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
 
     await fetch(`${API_ENDPOINTS.TREE_NODES}/${selectedNodeId}`, {
       method: 'DELETE',
+      headers: auth.getAuthHeaders(),
     });
 
     setNodes(prev => prev.filter(n => n.id !== selectedNodeId));
@@ -268,6 +276,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
 
     await fetch(`${API_ENDPOINTS.TREE_EDGES}/${selectedEdgeId}`, {
       method: 'DELETE',
+      headers: auth.getAuthHeaders(),
     });
 
     setEdges(prev => prev.filter(e => e.id !== selectedEdgeId));
@@ -279,6 +288,7 @@ export default function FAQWorkflowBuilder({ initialWorkflowId }: { initialWorkf
 
     await fetch(`${API_ENDPOINTS.TREE_WORKFLOWS}/${selectedWorkflow.id}`, {
       method: 'DELETE',
+      headers: auth.getAuthHeaders(),
     });
 
     setSelectedWorkflow(null);
