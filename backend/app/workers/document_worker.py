@@ -26,6 +26,11 @@ class DocumentWorkerService:
         """Establish RabbitMQ connection"""
         self.connection = await connect(settings.RABBITMQ_URL)
         self.channel = await self.connection.channel()
+        
+        # Set prefetch count to 1 to prevent worker from fetching all messages at once
+        # This enables fair distribution across multiple workers
+        await self.channel.set_qos(prefetch_count=1)
+        
         await self.channel.declare_queue("pdf_queue", durable=True)
         self.redis_client = get_redis_client()
         logger.info("✅ Connected to RabbitMQ & Redis Client initialized")
@@ -90,6 +95,9 @@ class DocumentWorkerService:
             chunks = await asyncio.to_thread(chunk_text, full_text)
             
             # 4. Insert to Milvus (Sync & Network Blocking)
+            # NOTE: insert_chunks will DELETE existing chunks for this document_id first
+            # This makes the operation idempotent - if this worker dies and message is requeued,
+            # the next worker will clean up any partial data before reinserting
             if chunks:
                 logger.info(f"💾 Storing {len(chunks)} text chunks in Milvus")
                 await asyncio.to_thread(

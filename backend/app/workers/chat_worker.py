@@ -110,6 +110,11 @@ class WorkerService:
         """Establish RabbitMQ connection"""
         self.connection = await connect(settings.RABBITMQ_URL)
         self.channel = await self.connection.channel()
+        
+        # Set prefetch count to 1 to prevent worker from fetching all messages at once
+        # This enables fair distribution across multiple workers
+        await self.channel.set_qos(prefetch_count=1)
+        
         await self.channel.declare_queue("chat_queue", durable=True)
         self.redis_client = get_redis_client()
         logger.info("✅ Connected to RabbitMQ & Redis Client initialized")
