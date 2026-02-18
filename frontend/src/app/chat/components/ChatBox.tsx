@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { API_ENDPOINTS } from '@/config/api';
 import { auth } from '@/lib/auth';
-import { Send, Bot, User } from 'lucide-react';
+import { Send, Bot, User, Mic, MicOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 
 type ButtonOption = {
   label: string;
@@ -30,6 +31,17 @@ export default function ChatBox() {
   // Search Suggestions State
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  
+  // Speech Recognition
+  const {
+    transcript,
+    isListening,
+    isSupported: isSpeechSupported,
+    error: speechError,
+    startListening,
+    stopListening,
+    resetTranscript
+  } = useSpeechRecognition();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -300,6 +312,32 @@ export default function ChatBox() {
     setShowSuggestions(false);
   };
 
+  /* ---------------- SPEECH RECOGNITION ---------------- */
+  // Update input when speech transcript changes
+  useEffect(() => {
+    if (transcript) {
+      setInput(prev => prev + transcript);
+      resetTranscript();
+    }
+  }, [transcript, resetTranscript]);
+
+  // Handle mic button click
+  const handleMicClick = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+      setShowSuggestions(false); // Hide suggestions when using voice
+    }
+  };
+
+  // Show speech error as toast/notification (optional)
+  useEffect(() => {
+    if (speechError) {
+      console.error('Speech recognition error:', speechError);
+    }
+  }, [speechError]);
+
 
   const sendMessage = async (textOverride?: string) => {
     const textToSend = textOverride || input;
@@ -518,7 +556,23 @@ export default function ChatBox() {
             )}
           </AnimatePresence>
 
-          <div className="flex items-end gap-2 bg-gray-50 rounded-2xl p-2 border border-gray-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all">
+          <div className={`flex items-end gap-2 bg-gray-50 rounded-2xl p-2 border-2 transition-all ${
+            isListening 
+              ? 'border-red-400 ring-2 ring-red-200 bg-red-50/50' 
+              : 'border-gray-200 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50'
+          }`}>
+            {/* Listening Indicator */}
+            {isListening && (
+              <div className="flex items-center gap-2 px-2">
+                <div className="flex gap-1">
+                  <span className="w-1 h-4 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-1 h-6 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-1 h-4 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></span>
+                </div>
+                <span className="text-xs font-medium text-red-600">Listening...</span>
+              </div>
+            )}
+
             <textarea
               ref={inputRef as any}
               value={input}
@@ -529,13 +583,30 @@ export default function ChatBox() {
                   sendMessage();
                 }
               }}
-              placeholder="Type a message..."
+              placeholder={isListening ? "Speak now..." : "Type a message..."}
               disabled={loading && !currentResponse && false} // Allow typing while streaming
               rows={1}
               className="flex-1 bg-transparent px-2 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none resize-none max-h-32"
               style={{ minHeight: '44px' }}
             />
 
+            {/* Mic/Stop Button */}
+            {isSpeechSupported && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleMicClick}
+                className={`p-2 rounded-xl transition-all ${
+                  isListening
+                    ? 'bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600'
+                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                }`}
+                title={isListening ? 'Stop listening' : 'Start voice input'}
+              >
+                {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+              </motion.button>
+            )}
+
+            {/* Send Button */}
             <button
               onClick={() => sendMessage()}
               disabled={!input.trim() || !isConnected}
