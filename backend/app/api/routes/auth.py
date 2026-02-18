@@ -1,8 +1,11 @@
-from fastapi import APIRouter, HTTPException, Response, Depends
+from fastapi import APIRouter, HTTPException, Response, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from app.db.session import get_connection
 from app.core.security import generate_jwt, verify_password, get_password_hash
+from app.core.oauth import get_google_user_info
+from app.core.config import settings
+import uuid
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -167,3 +170,123 @@ def login_for_swagger(form_data: OAuth2PasswordRequestForm = Depends()):
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# -------------------- GOOGLE OAUTH ROUTES --------------------
+
+@router.get("/google/login")
+async def google_login(request: Request, prompt: str = None):
+    """
+    Initiate Google OAuth login flow.
+    Returns the Google authorization URL to redirect the user to.
+    
+    Query params:
+    - prompt: 'select_account' to force account selection even if already logged in
+    """
+    redirect_uri = settings.GOOGLE_REDIRECT_URI
+    
+    # Import here to avoid circular dependency
+    from app.core.oauth import oauth
+    
+    # Generate authorization URL with optional prompt parameter
+    extra_params = {}
+    if prompt:
+        extra_params['prompt'] = prompt
+    
+    return await oauth.google.authorize_redirect(request, redirect_uri, **extra_params)
+
+
+@router.get("/google/callback", response_model=UserResponse)
+async def google_callback(request: Request):
+    """
+    Handle Google OAuth callback.
+    Exchanges authorization code for user info and creates/logs in user.
+    """
+    try:
+        # Get user info from Google
+        user_info = await get_google_user_info(request)
+        
+        if not user_info:
+            raise HTTPException(status_code=400, detail="Failed to get user info from Google")
+        
+        google_id = user_info.get('sub')
+        email = user_info.get('email')
+        name = user_info.get('name', email.split('@')[0])
+        
+        if not google_id or not email:
+            raise HTTPException(status_code=400, detail="Invalid user info from Google")
+        
+        conn = get_connection()
+        cur = conn.cursor()
+        
+        try:
+            # Check if user exists with this Google ID
+            cur.execute(
+                """SELECT id, username, email, role 
+                   FROM users 
+                   WHERE oauth_provider = 'google' AND oauth_provider_id = %s""",
+                (google_id,)
+            )
+            user = cur.fetchone()
+            
+            if user:
+                # Existing Google user - log them in
+                user_id, username, email, role = user
+            else:
+                # Check if email already exists with different provider
+                cur.execute(
+                    "SELECT id, oauth_provider FROM users WHERE email = %s",
+                    (email,)
+                )
+                existing = cur.fetchone()
+                
+                if existing:
+                    provider = existing[1]
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Email already registered with {provider} login. Please use {provider} to sign in."
+                    )
+                
+                # Create new user with Google OAuth
+                user_id = str(uuid.uuid4())
+                cur.execute(
+                    """INSERT INTO users (id, username, email, password, role, oauth_provider, oauth_provider_id)
+                       VALUES (%s, %s, %s, NULL, 'user', 'google', %s)
+                       RETURNING id, username, email, role""",
+                    (user_id, name, email, google_id)
+                )
+                user = cur.fetchone()
+                conn.commit()
+                
+                user_id, username, email, role = user
+            
+            # Generate JWT token
+            token = generate_jwt(str(user_id), role, email)
+            
+            # Redirect to frontend with user data
+            from fastapi.responses import RedirectResponse
+            from urllib.parse import urlencode
+            
+            user_data = {
+                "user_id": str(user_id),
+                "username": username,
+                "email": email,
+                "role": role,
+                "access_token": token,
+                "token_type": "bearer"
+            }
+            
+            # Redirect to frontend callback with data as query params
+            params = urlencode(user_data)
+            redirect_url = f"{settings.FRONTEND_URL}/auth/google/callback?{params}"
+            
+            return RedirectResponse(url=redirect_url)
+            
+        finally:
+            cur.close()
+            conn.close()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"OAuth callback failed: {str(e)}")
