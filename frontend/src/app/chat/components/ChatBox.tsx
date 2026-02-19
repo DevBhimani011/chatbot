@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { API_ENDPOINTS } from '@/config/api';
 import { auth } from '@/lib/auth';
-import { Send, Bot, User, Mic, MicOff } from 'lucide-react';
+import { Send, Bot, User, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
 
 type ButtonOption = {
   label: string;
@@ -42,6 +43,21 @@ export default function ChatBox() {
     stopListening,
     resetTranscript
   } = useSpeechRecognition();
+
+  // Text-to-Speech
+  const {
+    speak,
+    stop: stopSpeaking,
+    isSpeaking,
+    isSupported: isTTSSupported
+  } = useSpeechSynthesis();
+  
+  const [currentSpeakingIndex, setCurrentSpeakingIndex] = useState<number | null>(null);
+
+  // Debug TTS support
+  useEffect(() => {
+    console.log('TTS Supported:', isTTSSupported);
+  }, [isTTSSupported]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -338,8 +354,56 @@ export default function ChatBox() {
     }
   }, [speechError]);
 
+  /* ---------------- TEXT-TO-SPEECH ---------------- */
+  // Render text with markdown formatting
+  const renderHighlightedText = (text: string, shouldHighlight: boolean) => {
+    return (
+      <div className="prose prose-sm max-w-none">
+        <ReactMarkdown 
+          remarkPlugins={[remarkGfm]}
+          components={{
+            p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+            strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+            em: ({node, ...props}) => <em className="italic" {...props} />,
+            ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2" {...props} />,
+            ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2" {...props} />,
+            li: ({node, ...props}) => <li className="mb-1" {...props} />,
+            code: ({node, inline, ...props}: any) => 
+              inline 
+                ? <code className="bg-gray-100 px-1 py-0.5 rounded text-xs" {...props} />
+                : <code className="block bg-gray-100 p-2 rounded my-2 text-xs" {...props} />
+          }}
+        >
+          {text}
+        </ReactMarkdown>
+      </div>
+    );
+  };
 
+  const handleSpeakMessage = (text: string, messageIndex: number) => {
+    if (isSpeaking && currentSpeakingIndex === messageIndex) {
+      // Stop if already speaking this message
+      stopSpeaking();
+      setCurrentSpeakingIndex(null);
+    } else {
+      // Stop any current speech and start new one
+      stopSpeaking();
+      setCurrentSpeakingIndex(messageIndex);
+      speak(text);
+    }
+  };
+
+  // Clear speaking index when speech ends
+  useEffect(() => {
+    if (!isSpeaking) {
+      setCurrentSpeakingIndex(null);
+    }
+  }, [isSpeaking]);
+
+  // Stop speech when user sends a new message
   const sendMessage = async (textOverride?: string) => {
+    stopSpeaking();
+    setCurrentSpeakingIndex(null);
     const textToSend = textOverride || input;
     
     if (!textToSend.trim() || !socket || socket.readyState !== WebSocket.OPEN) {
@@ -464,27 +528,10 @@ export default function ChatBox() {
                       : 'bg-white text-gray-800 border border-gray-100 rounded-bl-sm'
                     }`}
                 >
-                  {msg.text && (
-                    <div className="prose prose-sm max-w-none">
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        components={{
-                          p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                          strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
-                          em: ({node, ...props}) => <em className="italic" {...props} />,
-                          ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2" {...props} />,
-                          ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2" {...props} />,
-                          li: ({node, ...props}) => <li className="mb-1" {...props} />,
-                          code: ({node, inline, ...props}: any) => 
-                            inline 
-                              ? <code className="bg-gray-100 px-1 py-0.5 rounded text-xs" {...props} />
-                              : <code className="block bg-gray-100 p-2 rounded my-2 text-xs" {...props} />
-                        }}
-                      >
-                        {msg.text}
-                      </ReactMarkdown>
-                    </div>
-                  )}
+                  {msg.text && (() => {
+                    const shouldHighlightThis = isSpeaking && currentSpeakingIndex === idx;
+                    return renderHighlightedText(msg.text, shouldHighlightThis);
+                  })()}
 
                   {/* Buttons */}
                   {msg.buttons && (
@@ -500,6 +547,36 @@ export default function ChatBox() {
                           {btn.label}
                         </motion.button>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Speaker Button (Bot messages only) */}
+                  {msg.sender === 'bot' && msg.text && isTTSSupported && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          handleSpeakMessage(msg.text!, idx);
+                        }}
+                        className={`flex items-center gap-2 text-xs font-medium transition-colors ${
+                          isSpeaking && currentSpeakingIndex === idx
+                            ? 'text-primary'
+                            : 'text-gray-500 hover:text-primary'
+                        }`}
+                      >
+                        {isSpeaking && currentSpeakingIndex === idx ? (
+                          <>
+                            <VolumeX size={16} className="animate-pulse" />
+                            <span>Stop</span>
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 size={16} />
+                            <span>Listen</span>
+                          </>
+                        )}
+                      </motion.button>
                     </div>
                   )}
                 </div>
