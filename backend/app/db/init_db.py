@@ -113,6 +113,22 @@ def init_db() -> None:
     cur.execute('ALTER TABLE tree_node ADD COLUMN IF NOT EXISTS position_y DOUBLE PRECISION;')
     cur.execute('ALTER TABLE tree_workflow ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();')
 
+
+    # ------------------------------------------------------
+    # Crawled URLs
+    # ------------------------------------------------------
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS crawled_url (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            url TEXT NOT NULL UNIQUE,
+            status TEXT NOT NULL DEFAULT 'pending',
+            last_crawled_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        """
+    )
+
     conn.commit()
     cur.close()
     conn.close()

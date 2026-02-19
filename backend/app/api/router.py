@@ -11,6 +11,8 @@ api_router.include_router(workflow.router)
 api_router.include_router(chatbot.router)
 api_router.include_router(tree_workflow.router)
 api_router.include_router(documents.router)
+from app.api.routes import crawler
+api_router.include_router(crawler.router)
 from app.api.routes import chat_ws
 api_router.include_router(chat_ws.router, prefix="/chat", tags=["Realtime Chat"])
 

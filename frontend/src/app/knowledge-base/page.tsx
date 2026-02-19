@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { API_ENDPOINTS } from '@/config/api';
 import { auth } from '@/lib/auth';
-import { Upload, FileText, Trash2, Calendar, HardDrive, Search, X, Eye, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Trash2, Calendar, HardDrive, Search, X, Eye, AlertCircle, Globe, RefreshCw, Plus, Link as LinkIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppNavbar } from '@/components/AppNavbar';
 
@@ -21,6 +21,14 @@ type Toast = {
   type: 'success' | 'error' | 'info';
 };
 
+type CrawledUrl = {
+  id: string;
+  url: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  last_crawled_at: string | null;
+  created_at: string;
+};
+
 export default function KnowledgeBasePage() {
   const router = useRouter();
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -34,6 +42,13 @@ export default function KnowledgeBasePage() {
     show: false,
     document: null,
   });
+  
+  // URL Handler State
+  const [activeTab, setActiveTab] = useState<'documents' | 'urls'>('documents');
+  const [urls, setUrls] = useState<CrawledUrl[]>([]);
+  const [newUrl, setNewUrl] = useState('');
+  const [addingUrl, setAddingUrl] = useState(false);
+  const [crawlingUrlId, setCrawlingUrlId] = useState<string | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     const id = Date.now();
@@ -60,6 +75,23 @@ export default function KnowledgeBasePage() {
     }
   };
 
+  const fetchUrls = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_ENDPOINTS.BASE_URL}/crawler/urls`, {
+        headers: auth.getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error('Failed to fetch URLs');
+      const data = await res.json();
+      setUrls(data);
+    } catch (error) {
+      console.error('Error fetching URLs:', error);
+      showToast('Error fetching URLs', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Check if user is logged in and is admin
     const userData = localStorage.getItem('user');
@@ -74,8 +106,12 @@ export default function KnowledgeBasePage() {
       return;
     }
     
-    fetchDocuments();
-  }, [router]);
+    if (activeTab === 'documents') {
+      fetchDocuments();
+    } else {
+      fetchUrls();
+    }
+  }, [router, activeTab]);
 
   // Filter documents based on search query
   useEffect(() => {
@@ -88,6 +124,71 @@ export default function KnowledgeBasePage() {
       setFilteredDocuments(filtered);
     }
   }, [searchQuery, documents]);
+
+  // URL Handlers
+  const handleAddUrl = async () => {
+    if (!newUrl) return;
+    try {
+      setAddingUrl(true);
+      const res = await fetch(`${API_ENDPOINTS.BASE_URL}/crawler/urls`, {
+        method: 'POST',
+        headers: {
+          ...auth.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: newUrl }),
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || 'Failed to add URL');
+      }
+
+      showToast('URL added successfully', 'success');
+      setNewUrl('');
+      fetchUrls();
+    } catch (error: any) {
+      showToast(error.message, 'error');
+    } finally {
+      setAddingUrl(false);
+    }
+  };
+
+  const handleCrawlUrl = async (id: string) => {
+    try {
+      setCrawlingUrlId(id);
+      const res = await fetch(`${API_ENDPOINTS.BASE_URL}/crawler/urls/${id}/crawl`, {
+        method: 'POST',
+        headers: auth.getAuthHeaders(),
+      });
+
+      if (!res.ok) throw new Error('Failed to start crawl');
+
+      showToast('Crawling started', 'info');
+      fetchUrls(); // Update status
+    } catch (error) {
+      showToast('Error starting crawl', 'error');
+    } finally {
+      setCrawlingUrlId(null);
+    }
+  };
+
+  const handleDeleteUrl = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this URL?')) return;
+    try {
+      const res = await fetch(`${API_ENDPOINTS.BASE_URL}/crawler/urls/${id}`, {
+        method: 'DELETE',
+        headers: auth.getAuthHeaders(),
+      });
+
+      if (!res.ok) throw new Error('Failed to delete URL');
+
+      showToast('URL deleted', 'success');
+      fetchUrls();
+    } catch (error) {
+      showToast('Error deleting URL', 'error');
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -324,6 +425,58 @@ export default function KnowledgeBasePage() {
               </div>
             </label>
           </div>
+          
+          {/* Tabs */}
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl mb-6 w-fit">
+            <button
+              onClick={() => setActiveTab('documents')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'documents'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Documents ({documents.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('urls')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                activeTab === 'urls'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Crawled URLs ({urls.length})
+            </button>
+          </div>
+
+          {activeTab === 'urls' && (
+            <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                  <input
+                    type="url"
+                    placeholder="Enter URL to crawl (e.g. https://example.com/docs)"
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  />
+                </div>
+                <button
+                  onClick={handleAddUrl}
+                  disabled={addingUrl || !newUrl}
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-all font-medium flex items-center gap-2 disabled:opacity-50"
+                >
+                  <Plus size={18} />
+                  {addingUrl ? 'Adding...' : 'Add URL'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'documents' && (
+            <>
           {/* Search Bar */}
           <div className="mb-6">
             <div className="relative max-w-md">
@@ -434,6 +587,75 @@ export default function KnowledgeBasePage() {
               </AnimatePresence>
             </div>
           )}
+          </>
+        )}
+
+        {activeTab === 'urls' && (
+          <div className="grid gap-4">
+            {loading ? (
+               <div className="flex items-center justify-center h-32">
+                 <div className="flex gap-2">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></span>
+                 </div>
+               </div>
+            ) : urls.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Globe size={48} className="mx-auto mb-3 opacity-20" />
+                <p>No URLs added yet</p>
+              </div>
+            ) : (
+              urls.map((url) => (
+                <div key={url.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`p-2 rounded-lg ${
+                      url.status === 'completed' ? 'bg-green-100 text-green-600' :
+                      url.status === 'failed' ? 'bg-red-100 text-red-600' :
+                      'bg-blue-100 text-blue-600'
+                    }`}>
+                      <Globe size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <a href={url.url} target="_blank" rel="noopener noreferrer" className="font-medium text-gray-900 truncate block hover:underline">
+                        {url.url}
+                      </a>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          url.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          url.status === 'failed' ? 'bg-red-100 text-red-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {url.status}
+                        </span>
+                        {url.last_crawled_at && (
+                          <span>Last crawled: {formatDate(url.last_crawled_at)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleCrawlUrl(url.id)}
+                      disabled={crawlingUrlId === url.id || url.status === 'processing'}
+                      className="p-2 text-gray-400 hover:text-primary hover:bg-gray-50 rounded-lg transition-all"
+                      title="Re-crawl"
+                    >
+                      <RefreshCw size={18} className={url.status === 'processing' || crawlingUrlId === url.id ? 'animate-spin' : ''} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUrl(url.id)}
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                      title="Delete"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
         </div>
       </main>
     </div>

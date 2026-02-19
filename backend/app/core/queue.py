@@ -19,6 +19,7 @@ class RabbitMQClient:
                 # Declare the queue to ensure it exists
                 await self.channel.declare_queue("chat_queue", durable=True)
                 await self.channel.declare_queue("pdf_queue", durable=True)
+                await self.channel.declare_queue("crawler_queue", durable=True)
                 logger.info("✅ Connected to RabbitMQ")
             except Exception as e:
                 logger.error(f"❌ Failed to connect to RabbitMQ: {e}")
