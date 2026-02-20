@@ -28,9 +28,7 @@ def generate_answer(context: str, question: str) -> dict:
 
 Instructions:
 - Answer the question using ONLY information from the context below
-- Extract the exact value requested (dates, names, numbers, etc.)
 - If the information is in a table format, look for the relevant row and column
-- Be concise and direct - provide just the answer
 - If you truly cannot find the answer in the context, say: "No answer found in the document."""
     
     user_message = f"""Context:
