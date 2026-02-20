@@ -8,7 +8,7 @@ from app.core.redis import get_redis_client
 from aio_pika import connect, IncomingMessage
 from app.rag.minio_client import get_minio_client
 from app.rag.pdf_loader import extract_text_and_tables_from_pdf
-from app.rag.chunking import chunk_text, table_rows_to_chunks
+from app.rag.chunking import chunk_text, chunk_markdown
 from app.rag.milvus_store import insert_chunks, insert_table_rows
 from minio.commonconfig import CopySource
 
@@ -51,7 +51,6 @@ class DocumentWorkerService:
             logger.info(f"📨 Received PDF task: {filename} ({document_id})")
             
 
-
             # 1. Download from MinIO (Sync)
             logger.info(f"⬇️ Downloading from MinIO: {object_name}")
             def download_file():
@@ -65,41 +64,24 @@ class DocumentWorkerService:
 
             pdf_bytes = await asyncio.to_thread(download_file)
             
-            # 2. Extract Text/Tables (Sync & CPU Intensive)
-            logger.info(f"🔍 Extracting text and tables from: {filename}")
+            # 2. Extract Text/Tables (Sync & CPU Intensive) - NOW USES DOCLING
+            logger.info(f"🔍 Extracting structure (Docling) from: {filename}")
             pages_text, tables = await asyncio.to_thread(extract_text_and_tables_from_pdf, pdf_bytes)
-            full_text = "\n\n".join(pages_text.values())
-
-            if not full_text.strip() and not tables:
-                logger.warning(f"⚠️ No text or tables found in: {filename}")
             
-            # Handle tables if text is empty
-            if not full_text.strip() and tables:
-                logger.info("Converting tables to text format (no regular text found)")
-                table_texts = []
-                for table_data in tables:
-                    table_str = f"Table (Page {table_data.get('page_number', 'unknown')}):\n"
-                    table = table_data.get('rows', [])
-                    if table:
-                        if len(table) > 0:
-                            headers = table[0]
-                            table_str += " | ".join(str(h) for h in headers) + "\n"
-                            table_str += "-" * (len(headers) * 10) + "\n"
-                        for row in table[1:] if len(table) > 1 else table:
-                            table_str += " | ".join(str(cell) for cell in row) + "\n"
-                    table_texts.append(table_str)
-                full_text = "\n\n".join(table_texts)
+            # pages_text contains the full markdown (usually on key 1)
+            full_markdown = "\n\n".join(str(v) for v in pages_text.values())
 
-            # 3. Chunk Text (Sync)
-            logger.info(f"✂️ Chunking text...")
-            chunks = await asyncio.to_thread(chunk_text, full_text)
+            if not full_markdown.strip():
+                logger.warning(f"⚠️ No text found in: {filename}")
+            
+            # 3. Chunk Markdown (Sync)
+            logger.info(f"✂️ Chunking markdown (aware of headers/tables)...")
+            chunks = await asyncio.to_thread(chunk_markdown, full_markdown)
             
             # 4. Insert to Milvus (Sync & Network Blocking)
             # NOTE: insert_chunks will DELETE existing chunks for this document_id first
-            # This makes the operation idempotent - if this worker dies and message is requeued,
-            # the next worker will clean up any partial data before reinserting
             if chunks:
-                logger.info(f"💾 Storing {len(chunks)} text chunks in Milvus")
+                logger.info(f"💾 Storing {len(chunks)} chunks in Milvus")
                 await asyncio.to_thread(
                     insert_chunks,
                     document_id=document_id,
@@ -107,17 +89,11 @@ class DocumentWorkerService:
                     chunks=chunks
                 )
             
-            # 5. Insert Tables (Sync)
+            # 5. Insert Tables (DEPRECATED / SKIPPED)
+            # Docling embeds tables in the markdown chunks, so we don't need separate table rows.
             if tables:
-                table_rows = table_rows_to_chunks(tables)
-                if table_rows:
-                    logger.info(f"💾 Storing {len(table_rows)} table rows in Milvus")
-                    await asyncio.to_thread(
-                        insert_table_rows,
-                        document_id=document_id,
-                        filename=filename,
-                        rows=table_rows
-                    )
+                logger.info(f"ℹ️ Legacy explicit tables found: {len(tables)} (This should match Docling legacy return [] )")
+
 
             logger.info(f"✅ PDF processing completed: {filename}")
             

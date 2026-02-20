@@ -16,6 +16,7 @@ def create_collection():
     connect_milvus()
 
     if utility.has_collection(COLLECTION_NAME):
+        print(f"Collection {COLLECTION_NAME} already exists. Skipping creation.")
         return
 
     fields = [
@@ -38,7 +39,7 @@ def create_collection():
         FieldSchema(
             name="chunk_text",
             dtype=DataType.VARCHAR,
-            max_length=4000,  # Increased for table rows with context
+            max_length=8192,  # Increased for larger markdown chunks/tables
         ),
         FieldSchema(
             name="filename",

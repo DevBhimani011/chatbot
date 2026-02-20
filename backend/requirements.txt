@@ -1,4 +1,4 @@
-FASTAPI
+fastapi
 uvicorn[standard]
 psycopg2-binary
 python-dotenv
@@ -10,10 +10,7 @@ pymilvus
 sentence-transformers
 python-multipart
 strawberry-graphql[fastapi]
-pdfplumber
-pdf2image
-pytesseract
-Pillow
+docling
 PyJWT==2.8.0
 redis
 aio-pika

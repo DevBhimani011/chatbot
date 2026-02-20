@@ -1,7 +1,7 @@
 import re
 from typing import List
 
-from typing import Any
+
 
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 160
@@ -48,109 +48,65 @@ def chunk_text(text: str) -> List[str]:
     return chunks
 
 
-def table_rows_to_chunks(
-    tables: list[dict[str, Any]],
-    *,
-    max_fields: int = 32,
-) -> list[dict[str, Any]]:
-    """Convert extracted pdf tables into row-level chunks.
-    
-    Each row is stored with its complete header information for better semantic search.
-    Handles complex tables with merged cells and varying structures.
+
+def chunk_markdown(text: str, chunk_size: int = 1500, overlap: int = 200) -> List[str]:
     """
-    results: list[dict[str, Any]] = []
-
-    def _is_empty_row(row: list[str]) -> bool:
-        return all((c or "").strip() == "" for c in row)
+    Chunks Markdown text while respecting structure (Headers, Tables).
     
-    def _clean_value(val: str) -> str:
-        """Clean and normalize cell values."""
-        if not val:
-            return ""
-        # Remove excessive whitespace
-        val = " ".join(val.split())
-        return val.strip()
-
-    for table in tables or []:
-        rows: list[list[str]] = table.get("rows") or []
-        if not rows:
-            continue
-
-        # Find the first non-empty row as header
-        header_row: list[str] | None = None
-        data_start_idx: int = 0
+    Strategy:
+    1.  Split by top-level headers (#, ##) to keep sections together.
+    2.  If a section is too big, split by paragraphs/newlines but try to keep tables content together.
+    3.  If a table is split, inject the last active Header to maintain context.
+    """
+    # Simple recursive splitting for now
+    # In a full implementation, we'd build a tree of sections.
+    
+    # 1. Normalize
+    text = text.strip()
+    if not text:
+        return []
         
-        for idx, row in enumerate(rows):
-            if not _is_empty_row(row):
-                header_row = [_clean_value(c or "") for c in row]
-                data_start_idx = idx + 1
-                break
-
-        if header_row is None or data_start_idx >= len(rows):
+    chunks = []
+    
+    # Split by double newline to get paragraphs/blocks
+    blocks = re.split(r'\n\n+', text)
+    
+    current_chunk = []
+    current_length = 0
+    last_header = ""
+    
+    for block in blocks:
+        block = block.strip()
+        if not block:
             continue
-
-        # Normalize header: assign default names to empty headers
-        base_headers = [h if h else f"Column {i+1}" for i, h in enumerate(header_row)]
-        base_headers = base_headers[:max_fields]
-
-        # Process each data row
-        for row_idx, row in enumerate(rows[data_start_idx:], start=1):
-            if _is_empty_row(row):
-                continue
-
-            # Clean all cell values
-            values = [_clean_value(c or "") for c in row][:max_fields]
             
-            # Match header and value lengths
-            headers = list(base_headers)
-            if len(values) < len(headers):
-                values.extend([""] * (len(headers) - len(values)))
-            elif len(values) > len(headers):
-                # Add generic headers for extra columns
-                extra_headers = [f"Column {i+1}" for i in range(len(headers), len(values))]
-                headers = (headers + extra_headers)[:max_fields]
-                values = values[:len(headers)]
-
-            # Build multiple representations for robust search
+        # Check if block is a header
+        if block.startswith("#"):
+             last_header = block.split('\n')[0] # Take the first line if multiple
+             
+        block_len = len(block)
+        
+        # If adding this block exceeds size
+        if current_length + block_len > chunk_size and current_length > 0:
+            # Finalize current chunk
+            chunk_str = "\n\n".join(current_chunk)
+            chunks.append(chunk_str)
             
-            # 1. Structured field list (key: value pairs)
-            field_pairs = []
-            for i in range(len(headers)):
-                if headers[i] and values[i]:
-                    field_pairs.append(f"{headers[i]}: {values[i]}")
-            fields_text = "; ".join(field_pairs)
+            # Start new chunk
+            # Inject context (Header) if appropriate
+            current_chunk = []
+            current_length = 0
             
-            # 2. Header and row as pipe-separated
-            header_line = " | ".join(headers)
-            row_line = " | ".join(values)
-            
-            # 3. Natural language context for better embeddings
-            natural_sentences = []
-            for i in range(len(headers)):
-                if headers[i] and values[i]:
-                    natural_sentences.append(f"The {headers[i]} is {values[i]}")
-            natural_text = ". ".join(natural_sentences)
-            
-            # 4. Concatenate all values for text search
-            all_values = " ".join([v for v in values if v])
-
-            # Build final chunk with multiple formats
-            chunk_text = (
-                f"TABLE_ROW\n"
-                f"Page: {table.get('page_number')}\n"
-                f"Table: {table.get('table_index')}\n"
-                f"Headers: {header_line}\n"
-                f"Row: {row_line}\n"
-                f"Fields: {fields_text}\n"
-                f"Context: {natural_text}\n"
-                f"Content: {all_values}"
-            ).strip()
-
-            results.append({
-                "text": chunk_text,
-                "page_number": int(table.get("page_number") or 0),
-                "table_index": int(table.get("table_index") or 0),
-                "row_index": row_idx,
-            })
-
-    return results
+            if last_header and not block.startswith("#"):
+                 # Inject header if we are continuing a section
+                 current_chunk.append(f"(Context: {last_header})")
+                 current_length += len(current_chunk[0])
+        
+        current_chunk.append(block)
+        current_length += block_len
+        
+    # Add remainder
+    if current_chunk:
+        chunks.append("\n\n".join(current_chunk))
+        
+    return chunks

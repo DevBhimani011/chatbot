@@ -11,8 +11,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-SIMILARITY_THRESHOLD = 0.3  # Balanced threshold for quality matches
-TOP_K = 10  # Focused retrieval for better performance
+SIMILARITY_THRESHOLD = 0.7  # Balanced threshold for quality matches
+TOP_K = 3  # Focused retrieval for better performance
 
 
 def answer_question(question: str) -> dict:
@@ -70,6 +70,8 @@ def answer_question(question: str) -> dict:
         logger.info(f"Chunk {i}: Similarity = {r['similarity']:.4f} | Source: {r['filename']}")
     logger.info(f"{'-'*80}")
     logger.info(f"Total Context: {len(context)} chars (~{len(context)//4} tokens)")
+    logger.info(f"{'-'*80}")
+    logger.info(f"📝 FULL CONTEXT SENT TO LLM:\n{context}")
     logger.info(f"{'='*80}\n")
 
     # 4️⃣ Generate answer using LLM
